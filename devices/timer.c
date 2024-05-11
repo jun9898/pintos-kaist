@@ -32,6 +32,7 @@ static void real_time_sleep (int64_t num, int32_t denom);
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
+
 void
 timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
@@ -41,7 +42,8 @@ timer_init (void) {
 	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
-
+	/* 8254 타이머의 인터럽트를 처리하기위해 함수를 인터럽트 번호
+	   0x20에 등록 */
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -90,11 +92,13 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
+	printf("======1=========\n");
 	int64_t start = timer_ticks ();
-
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	// ASSERT (intr_get_level () == INTR_ON);
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+	// if (timer_elapsed (start) < ticks)
+	thread_sleep (start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -120,12 +124,22 @@ void
 timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
-/* Timer interrupt handler. */
+
+/* Timer interrupt handler. 
+   쓰레드.c 에서 glbal_tick을 가져와 현재틱과 비교해서 크다면
+   thread_wakeup() 실행 */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
+	printf("======interrupt=========\n");
+	/* At every tick, check whether some thread must
+	   wake up from sleep queue and call wake up function. */
+	int64_t global_tick = get_global_tick();
 	ticks++;
 	thread_tick ();
+	if (global_tick < ticks){
+		printf("golbal_tick: %d, %d", global_tick, ticks);
+		thread_wakeup();
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

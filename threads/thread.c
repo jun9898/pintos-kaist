@@ -27,6 +27,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+/* 슬립리스트 */
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -49,6 +51,9 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
+/* 글로벌틱 volatile ->  */
+static int64_t global_tick = INT64_MAX;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -63,7 +68,12 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+int64_t get_global_tick();
+void set_global_tick();
+//------
+
 /* Returns true if T appears to point to a valid thread. */
+/* 유효한 쓰레드를 가리키는지 확인하는 함수 */ 
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
 /* Returns the running thread.
@@ -71,12 +81,15 @@ static tid_t allocate_tid (void);
  * down to the start of a page.  Since `struct thread' is
  * always at the beginning of a page and the stack pointer is
  * somewhere in the middle, this locates the curent thread. */
+/* rrsp() 함수를 호출하여 현재 CPU의 스택포인터를 통해 현재 실행 중인 스레드의 구조체의 시작위치를
+ 포인터로 캐스팅하여 반환*/
 #define running_thread() ((struct thread *) (pg_round_down (rrsp ())))
 
 
 // Global descriptor table for the thread_start.
 // Because the gdt will be setup after the thread_init, we should
 // setup temporal gdt first.
+/* GDT을 초기화 */
 static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
 /* Initializes the threading system by transforming the code
@@ -92,8 +105,11 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
+   /* 쓰레드 시스템 초기화 */
 void
 thread_init (void) {
+	/* 현제 인터럽트 레빌이 'INTR_OFF'인지 확인, 아니라면 오류발생
+	 * 이는 인터럽트가 비활성화된 상태에서만 스레드 시스템을 초기화해야 하기때문이다. */
 	ASSERT (intr_get_level () == INTR_OFF);
 
 	/* Reload the temporal gdt for the kernel
@@ -109,6 +125,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -132,6 +149,17 @@ thread_start (void) {
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down (&idle_started);
 }
+int64_t get_global_tick(){
+	return global_tick;
+}
+
+void set_global_tick(){
+	struct list_elem *v = list_begin(&sleep_list);
+	struct thread *min = list_entry(v, struct thread, elem);
+
+	global_tick = min->tick;
+}
+
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
@@ -216,11 +244,69 @@ thread_create (const char *name, int priority,
    This function must be called with interrupts turned off.  It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
+
+/* 슬립리스트에서 글로벌틱과 로컬틱을 확인해 read_list에 추가 */
+int64_t
+thread_wakeup(int64_t *ticks)
+{
+	printf("======5=========\n");
+	struct list_elem *first = list_begin(&sleep_list);
+	struct thread *cur_thread;
+
+	while(!list_empty(&sleep_list))
+	{
+		cur_thread = list_entry(first, struct thread, elem);
+
+		if (cur_thread->tick > global_tick) break;
+
+		intr_disable();
+		cur_thread->tick = 0;
+		thread_unblock(cur_thread);
+
+		first = list_next(first);
+	}
+	set_global_tick();
+}
+bool
+tick_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->tick < b->tick;
+}
+/* 쓰레드를 블락시키고 슬립리스트에 추가한다. */
+void
+thread_sleep(int64_t ticks)
+{
+	struct thread *cur = thread_current(); /* 현재쓰레드를 가져온다. */
+	enum intr_level old_level;
+	printf("======2=========\n");
+
+	ASSERT (!intr_context());
+
+	old_level = intr_disable();
+
+	if (cur != idle_thread){		/* 아이들쓰레드가 아니면 */
+		cur->tick = ticks;			/* 블락시키고 슬립리스트에 추가한다. */
+		cur->status = THREAD_BLOCKED;
+		list_insert_ordered(&sleep_list, &cur->elem, tick_less, &cur->tick);
+		schedule();
+		intr_set_level(old_level);
+		printf("======3=========\n");
+		set_global_tick();
+	}
+
+
+}
+
 void
 thread_block (void) {
-	ASSERT (!intr_context ());
-	ASSERT (intr_get_level () == INTR_OFF);
+	ASSERT (!intr_context ()); // 인터럽트 컨텍스트에서 실행중인지 확인
+	ASSERT (intr_get_level () == INTR_OFF); // 현재 인터럽트가 비활성화 되어있는지 확인
 	thread_current ()->status = THREAD_BLOCKED;
+	printf("======block=========\n");
 	schedule ();
 }
 
@@ -234,8 +320,8 @@ thread_block (void) {
    update other data. */
 void
 thread_unblock (struct thread *t) {
-	enum intr_level old_level;
 
+	enum intr_level old_level;
 	ASSERT (is_thread (t));
 
 	old_level = intr_disable ();
@@ -263,6 +349,7 @@ thread_current (void) {
 	   have overflowed its stack.  Each thread has less than 4 kB
 	   of stack, so a few big automatic arrays or moderate
 	   recursion can cause stack overflow. */
+
 	ASSERT (is_thread (t));
 	ASSERT (t->status == THREAD_RUNNING);
 
@@ -527,8 +614,8 @@ thread_launch (struct thread *th) {
  * It's not safe to call printf() in the schedule(). */
 static void
 do_schedule(int status) {
-	ASSERT (intr_get_level () == INTR_OFF);
-	ASSERT (thread_current()->status == THREAD_RUNNING);
+	ASSERT (intr_get_level () == INTR_OFF); // 인터럽트가 비활성화된 상태에서 실행되는지 확인
+	ASSERT (thread_current()->status == THREAD_RUNNING); // 현재 쓰레드 상태가 실행중인지 확인
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);
@@ -537,7 +624,8 @@ do_schedule(int status) {
 	thread_current ()->status = status;
 	schedule ();
 }
-
+/* 스케줄러에서 현재 실행 중인 쓰레드를 대체할 다음 실행할 쓰레드를 선택하고, 그 쓰레드를
+   실행하는 일련의 작업을 수행한다. */
 static void
 schedule (void) {
 	struct thread *curr = running_thread ();

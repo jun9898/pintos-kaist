@@ -593,8 +593,9 @@ int64_t thread_wakeup(int64_t *ticks) {
 
     if (cur_thread->tick > ticks) break;
 
-    list_pop_front(&sleep_list);
-    thread_unblock(cur_thread);
+    struct list_elem *f = list_pop_front(&sleep_list);
+    struct thread *t = list_entry(f, struct thread, elem);
+    thread_unblock(t);
   }
   set_global_tick();
 }
@@ -622,7 +623,7 @@ void thread_sleep(int64_t ticks) {
 
   list_insert_ordered(&sleep_list, &cur->elem, tick_less, &cur->tick);
   set_global_tick();
-  
+
   thread_block();
   intr_set_level(old_level);
 }

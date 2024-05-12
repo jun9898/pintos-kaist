@@ -92,9 +92,8 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
-	printf("======1=========\n");
 	int64_t start = timer_ticks ();
-	// ASSERT (intr_get_level () == INTR_ON);
+	ASSERT (intr_get_level () == INTR_ON);
 	// while (timer_elapsed (start) < ticks)
 	// 	thread_yield ();
 	// if (timer_elapsed (start) < ticks)
@@ -130,15 +129,13 @@ timer_print_stats (void) {
    thread_wakeup() 실행 */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	printf("======interrupt=========\n");
 	/* At every tick, check whether some thread must
 	   wake up from sleep queue and call wake up function. */
 	int64_t global_tick = get_global_tick();
 	ticks++;
 	thread_tick ();
-	if (global_tick < ticks){
-		printf("golbal_tick: %d, %d", global_tick, ticks);
-		thread_wakeup();
+	if (global_tick <= ticks){
+		thread_wakeup(ticks);
 	}
 }
 

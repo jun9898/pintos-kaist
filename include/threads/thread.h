@@ -9,7 +9,6 @@
 #include "vm/vm.h"
 #endif
 
-
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING,     /* Running thread. */
@@ -85,6 +84,9 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
+bool pri_less(const struct list_elem *a_, const struct list_elem *b_,
+               void *aux UNUSED);
+void preempt();
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
@@ -94,6 +96,12 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	// --
+	struct list_elem d_elem;
+	struct lock *wait_on_lock;
+	struct list *donations;
+	
+	int64_t tick; /* local tick */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

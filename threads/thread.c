@@ -74,6 +74,7 @@ int64_t get_global_tick();
 void set_global_tick();
 int64_t thread_wakeup(int64_t *ticks);
 void thread_sleep(int64_t ticks);
+void preempt();
 //------
 
 /* Returns true if T appears to point to a valid thread. */
@@ -151,10 +152,15 @@ void thread_start(void) {
 int64_t get_global_tick() { return global_tick; }
 
 void set_global_tick() {
-  struct list_elem *v = list_begin(&sleep_list);
-  struct thread *min = list_entry(v, struct thread, elem);
+	if (!list_empty(&sleep_list)){
+		struct list_elem *v = list_begin(&sleep_list);
+		struct thread *min = list_entry(v, struct thread, elem);
 
-  global_tick = min->tick;
+		global_tick = min->tick;
+
+	} else {
+		int64_t global_tick = INT64_MAX;
+	}
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -196,6 +202,7 @@ void thread_print_stats(void) {
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
+
 tid_t thread_create(const char *name, int priority, thread_func *function,
                     void *aux) {
   struct thread *t;
@@ -224,6 +231,8 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
   /* Add to run queue. */
   thread_unblock(t);
+  preempt();
+
 
   return tid;
 }
@@ -242,6 +251,14 @@ void thread_block(void) {
   schedule();
 }
 
+bool pri_less(const struct list_elem *a_, const struct list_elem *b_,
+               void *aux UNUSED) {
+  const struct thread *a = list_entry(a_, struct thread, elem);
+  const struct thread *b = list_entry(b_, struct thread, elem);
+
+  return a->priority > b->priority;
+}
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -250,13 +267,16 @@ void thread_block(void) {
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
+
 void thread_unblock(struct thread *t) {
   enum intr_level old_level;
   ASSERT(is_thread(t));
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_push_back(&ready_list, &t->elem);
+
+  //list_push_back(&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, pri_less, NULL);
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -310,14 +330,28 @@ void thread_yield(void) {
   ASSERT(!intr_context());
 
   old_level = intr_disable();
-  if (curr != idle_thread) list_push_back(&ready_list, &curr->elem);
+  if (curr != idle_thread) list_insert_ordered(&ready_list, &curr->elem, pri_less, NULL);
   do_schedule(THREAD_READY);
   intr_set_level(old_level);
+}
+
+// 레디리스트에 첫번째와 비교해서 현재쓰래드가 우선순위가 더 낮다면 다음쓰레드에게 양보
+void preempt(void){
+  if(thread_current() == idle_thread) return;
+	if (list_empty(&ready_list)) return;
+  
+	int cur_thread_pri = thread_get_priority();
+	struct thread *ready_first_thread = list_entry(list_begin(&ready_list), struct thread, elem);
+	
+	int ready_first_pri = ready_first_thread->priority;
+	if (ready_first_pri > cur_thread_pri)
+		thread_yield();
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
   thread_current()->priority = new_priority;
+  preempt();
 }
 
 /* Returns the current thread's priority. */
@@ -404,6 +438,8 @@ static void init_thread(struct thread *t, const char *name, int priority) {
   t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->wait_on_lock = NULL;
+  t->donations = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -593,9 +629,10 @@ int64_t thread_wakeup(int64_t *ticks) {
 
     if (cur_thread->tick > ticks) break;
 
-    struct list_elem *f = list_pop_front(&sleep_list);
-    struct thread *t = list_entry(f, struct thread, elem);
-    thread_unblock(t);
+	list_pop_front(&sleep_list);
+    //struct thread *t = list_entry(first, struct thread, elem);
+    thread_unblock(cur_thread);
+    preempt();
   }
   set_global_tick();
 }
@@ -613,6 +650,7 @@ void thread_sleep(int64_t ticks) {
   enum intr_level old_level;
 
   ASSERT(!intr_context());
+  ASSERT(cur != idle_thread);
 
   if (cur == idle_thread) {
     return;
@@ -622,8 +660,8 @@ void thread_sleep(int64_t ticks) {
   cur->tick = ticks; /* 블락시키고 슬립리스트에 추가한다. */
 
   list_insert_ordered(&sleep_list, &cur->elem, tick_less, &cur->tick);
-  set_global_tick();
 
+  set_global_tick();
   thread_block();
   intr_set_level(old_level);
 }

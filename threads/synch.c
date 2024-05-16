@@ -1,6 +1,3 @@
-// test
-// pri
-
 /* This file is derived from source code for the Nachos
    instructional operating system.  The Nachos copyright notice
    is reproduced in full below. */
@@ -40,6 +37,7 @@
 bool cmp_sema_priority(const struct list_elem *a, const struct list_elem *b,
                        void *aux);
 void donate_priority();
+void return_priority(struct lock *lock);
 // void return_priority();
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -236,21 +234,37 @@ void lock_release(struct lock *lock) {
   if (list_empty(&lock->semaphore.waiters)) {
     lock->holder = NULL;
   } else {
-    // printf("1. %d\n", thread_current()->priority);
-    // printf("2. %d\n", thread_current()->priority);
     thread_current()->priority = thread_current()->temp_priority;
+    // lock_acquire에서 하기때문에 필요x
+    // lock->holder =
+    //     list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
 
-    lock->holder =
-        list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
-
-    // return_priority();
+    return_priority(&lock);
   }
   sema_up(&lock->semaphore);
 }
+/* 락이 release되었을때 락홀더의 도네이션들 중 가장 높은값을 우선순위로 바꿔주고 
+   
+   */
+void return_priority(struct lock *lock){
+  struct thread *cur = thread_current();
+  struct list_elem *d_elem, *next;
+  struct thread *d_cur = list_begin(&cur->donations);
+  while(next = list_next(d_elem) != list_end(&cur->donations)){
+    struct thread *cur_t = list_entry(next, struct thread, d_elem);
+    if (cur_t->wait_on_lock == lock){
+      next = list_remove(&cur_t->d_elem);
+    }else {
+      next = list_next(d_elem);
+    }
+  }
+  cur->priority = cur->temp_priority;
 
-// return_priority(){
+  if (list_empty(&cur->donations)) return;
 
-// }
+  cur->priority = list_begin(&cur->donations);
+
+}
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
@@ -304,7 +318,6 @@ void cond_wait(struct condition *cond, struct lock *lock) {
   ASSERT(lock_held_by_current_thread(lock));
 
   sema_init(&waiter.semaphore, 0);
-  // list_insert_ordered(&cond->waiters, &waiter.elem, cmp_sema_priority, NULL);
   list_push_back(&cond->waiters, &waiter.elem);
   lock_release(lock);
   sema_down(&waiter.semaphore);

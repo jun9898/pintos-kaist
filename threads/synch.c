@@ -71,7 +71,8 @@ void sema_down(struct semaphore *sema) {
 
   old_level = intr_disable();
   while (sema->value == 0) {
-    list_insert_ordered(&sema->waiters, &thread_current()->elem, pri_less, NULL);
+    list_insert_ordered(&sema->waiters, &thread_current()->elem, pri_less,
+                        NULL);
     thread_block();
   }
   sema->value--;
@@ -231,15 +232,21 @@ void lock_release(struct lock *lock) {
   if (list_empty(&lock->semaphore.waiters)) {
     lock->holder = NULL;
   } else {
-    //printf("1. %d\n", thread_current()->priority);
+    // printf("1. %d\n", thread_current()->priority);
+    // printf("2. %d\n", thread_current()->priority);
     thread_current()->priority = thread_current()->temp_priority;
-    //printf("2. %d\n", thread_current()->priority);
+
     lock->holder =
         list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
+
+    // return_priority();
   }
   sema_up(&lock->semaphore);
 }
 
+// return_priority(){
+
+// }
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
@@ -349,7 +356,11 @@ bool cmp_sema_priority(const struct list_elem *a, const struct list_elem *b,
 
 void donate_priority() {
   struct thread *cur = thread_current();
-  int pri_lock = cur->wait_on_lock->holder->priority;
-  int pri_cur = cur->priority;
-  if (pri_lock < pri_cur) cur->wait_on_lock->holder->priority = pri_cur;
+  while(cur->wait_on_lock != NULL){
+   struct thread *holder = cur->wait_on_lock->holder;
+   if (cur->priority > holder->priority){
+      holder->priority = cur->priority;
+      cur = holder;
+   }
+  }
 }

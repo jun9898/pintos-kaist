@@ -351,7 +351,8 @@ void thread_set_priority(int new_priority) {
   thread_current()->temp_priority = new_priority;
   thread_current()->priority = new_priority;
 
-  list_sort(&ready_list, pri_less, NULL);
+  //list_sort(&ready_list, pri_less, NULL);
+  update_donation();
   preempt();
 }
 

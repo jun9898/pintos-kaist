@@ -87,7 +87,8 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 bool pri_less(const struct list_elem *a_, const struct list_elem *b_,
               void *aux UNUSED);
-void preempt();
+void update_donation(void);       
+void preempt(void);
 struct thread {
   /* Owned by thread.c. */
   tid_t tid;                 /* Thread identifier. */

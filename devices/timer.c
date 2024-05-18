@@ -131,9 +131,29 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	/* At every tick, check whether some thread must
 	   wake up from sleep queue and call wake up function. */
-	int64_t global_tick = get_global_tick();
 	ticks++;
 	thread_tick ();
+	// 100틱 == 1초
+	// 현재 러닝중인 쓰레드의 recent_cpu를 1씩 올려주기
+	// 100틱 마다 모든 쓰레드에 대해 계산
+	// decay = (2*load_average)/ (2*load_average + 1)
+	struct thread *cur_t = thread_current();
+
+	// mlfqs option
+	if (thread_mlfqs){
+		incr_recent_cpu();
+		if (timer_ticks() % 4 == 0){
+			calc_priority();
+		}
+		
+		if (timer_ticks() % 100 == 0){
+			calc_load_avg();
+			calc_recent_cpu();
+		}
+	}
+
+
+	int64_t global_tick = get_global_tick();
 	if (global_tick <= ticks){
 		thread_wakeup(ticks);
 	}
@@ -195,3 +215,4 @@ real_time_sleep (int64_t num, int32_t denom) {
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
 	}
 }
+

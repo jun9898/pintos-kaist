@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
-#include "fixed_point.h"
+#include "threads/fixed_point.h"
 // 둘다 소수의 덧셈
 int fixed_add(int x, int y) {
     return x + y;
@@ -40,12 +40,4 @@ int fixed_to_int_round(int x) {
 // 소수를 정수 바꾸되, 내림
 int fixed_to_int_trunc(int x) {
     return x / F;
-}
-// 17.14로 표현된 고정소수점을 double float 형태로.
-double fixed_to_double(int x) {
-    return ((double)x) / F;
-}
-// double float 형태를 -> 17.14로 표현된 고정소수점 형태로.
-int double_to_fixed(double x) {
-    return (int)(x * F);
 }

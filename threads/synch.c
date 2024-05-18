@@ -238,14 +238,12 @@ void lock_release(struct lock *lock) {
     // lock_acquire에서 하기때문에 필요x
     // lock->holder =
     //     list_entry(list_begin(&lock->semaphore.waiters), struct thread, elem);
-
     return_priority(&lock);
   }
   sema_up(&lock->semaphore);
 }
-/* 락이 release되었을때 락홀더의 도네이션들 중 가장 높은값을 우선순위로 바꿔주고 
-   
-   */
+/* 락이 release되었을때 락홀더의 도네이션들 중 가장 높은값을 우선순위로 바꿔준다 */
+
 void return_priority(struct lock *lock){
   struct thread *cur = thread_current();
   struct list_elem *d_elem, *next;

@@ -162,5 +162,7 @@ int thread_get_load_avg(void);
 void do_iret(struct intr_frame *tf);
 
 void incr_recent_cpu(void);
-
+void calc_priority(void);
+int calc_load_avg(void);
+void calc_recent_cpu(void);
 #endif /* threads/thread.h */

@@ -81,7 +81,8 @@ void thread_sleep(int64_t ticks);
 void preempt();
 
 /* advenced scheduler fn */ 
-void calc_priority();
+void calc_priority(void);
+int calc_decay(void);
 
 /* Returns true if T appears to point to a valid thread. */
 /* 유효한 쓰레드를 가리키는지 확인하는 함수 */
@@ -360,6 +361,9 @@ void preempt() {
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
+  
+  if(thread_mlfqs) return;
+
   thread_current()->temp_priority = new_priority;
   thread_current()->priority = new_priority;
   list_sort(&ready_list, pri_less, NULL);
@@ -375,6 +379,7 @@ void thread_set_nice(int nice UNUSED) {
   enum intr_level ord_lovel = intr_disable();
   struct thread *cur = thread_current();
   cur->nice = nice;
+  preempt();
   intr_set_level(ord_lovel);
 }
 
@@ -713,11 +718,11 @@ calc_recent_cpu(void){
   struct thread *cur = thread_current();
   if(cur == idle_thread) return;
   int prev = cur->recent_cpu;
-  cur->recent_cpu = fixed_mul(decay(), prev) - fixed_mul(cur->nice*F, 2*F);
+  cur->recent_cpu = fixed_mul(calc_decay(), prev) - fixed_mul(cur->nice*F, 2*F);
 }
 
 int calc_decay(void){
-  int load_m_2 = fixed_mul_int(calc_load_avg(),2);
+  int load_m_2 = fixed_mul(calc_load_avg(),2*F);
   return fixed_div(load_m_2, fixed_add_int(load_m_2, 1));
 }
 // ready_list에서 대기중인 쓰레드와 실행중인 쓰레드의 갯수

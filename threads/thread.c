@@ -7,9 +7,9 @@
 #include <string.h>
 
 #include "intrinsic.h"
+#include "threads/fixed_point.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
-#include "threads/fixed_point.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
@@ -57,7 +57,8 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
 
 /* 글로벌틱 volatile ->  */
 static int64_t global_tick = INT64_MAX;
-static int load_avg;
+int load_avg;
+int decay;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -80,9 +81,8 @@ int64_t thread_wakeup(int64_t *ticks);
 void thread_sleep(int64_t ticks);
 void preempt();
 
-/* advenced scheduler fn */ 
-void calc_priority(void);
-int calc_decay(void);
+/* advenced scheduler fn */
+void calc_priority(struct thread *cur);
 
 /* Returns true if T appears to point to a valid thread. */
 /* 유효한 쓰레드를 가리키는지 확인하는 함수 */
@@ -135,14 +135,12 @@ void thread_init(void) {
   list_init(&destruction_req);
   list_init(&sleep_list);
   list_init(&all_list);
-  load_avg = 0;
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
   init_thread(initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid();
-  
 
   list_push_back(&all_list, &initial_thread->all_elem);
 }
@@ -154,6 +152,7 @@ void thread_start(void) {
   struct semaphore idle_started;
   sema_init(&idle_started, 0);
   thread_create("idle", PRI_MIN, idle, &idle_started);
+  load_avg = 0;
 
   /* Start preemptive thread scheduling. */
   intr_enable();
@@ -361,11 +360,13 @@ void preempt() {
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
-  
-  if(thread_mlfqs) return;
+  if (thread_mlfqs) return;
 
   thread_current()->temp_priority = new_priority;
   thread_current()->priority = new_priority;
+
+  update_donation();
+
   list_sort(&ready_list, pri_less, NULL);
   preempt();
 }
@@ -376,42 +377,39 @@ int thread_get_priority(void) { return thread_current()->priority; }
 /* Sets the current thread's nice value to NICE. */
 void thread_set_nice(int nice UNUSED) {
   /* TODO: Your implementation goes here */
-  enum intr_level ord_lovel = intr_disable();
-  struct thread *cur = thread_current();
-  cur->nice = nice;
+  enum intr_level old_level = intr_disable();
+  thread_current()->nice = nice;
+  intr_set_level(old_level);
   preempt();
-  intr_set_level(ord_lovel);
 }
 
 /* Returns the current thread's nice value. */
 int thread_get_nice(void) {
   /* TODO: Your implementation goes here */
-  enum intr_level ord_lovel = intr_disable();
+  enum intr_level old_level = intr_disable();
   struct thread *cur = thread_current();
   int current_nice = cur->nice;
-  intr_set_level(ord_lovel);
+  intr_set_level(old_level);
   return current_nice;
 }
 
 /* Returns 100 times the system load average. */
 int thread_get_load_avg(void) {
   /* TODO: Your implementation goes here */
-  enum intr_level ord_lovel = intr_disable();
-  struct thread *cur = thread_current();
-  int new_load_avg = calc_load_avg();
-  intr_set_level(ord_lovel);
-  return fixed_mul(new_load_avg, 100*F) ;
-
-
-  return 0;
+  enum intr_level old_level = intr_disable();
+  int load_avg_val = fixed_to_int_round(fixed_mul_int(load_avg, 100));
+  intr_set_level(old_level);
+  return load_avg_val;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int thread_get_recent_cpu(void) {
   /* TODO: Your implementation goes here */
-  enum intr_level ord_lovel = intr_disable();
-  struct thread *cur = thread_current();
-  return cur->recent_cpu;
+  enum intr_level old_level = intr_disable();
+  int recent_cpu_val =
+      fixed_to_int_round(fixed_mul(thread_current()->recent_cpu, 100 * F));
+  intr_set_level(old_level);
+  return recent_cpu_val;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -669,7 +667,7 @@ int64_t thread_wakeup(int64_t *ticks) {
     list_pop_front(&sleep_list);
     // struct thread *t = list_entry(first, struct thread, elem);
     thread_unblock(cur_thread);
-    preempt();
+    // preempt();
   }
   set_global_tick();
 }
@@ -702,46 +700,69 @@ void thread_sleep(int64_t ticks) {
   thread_block();
   intr_set_level(old_level);
 }
-void
-calc_priority(void){
-  struct list_elem *e, *next;
-  // for(e = list_begin(&ready_list));
-  while(next = list_next(e) != list_end(&all_list)){
-    struct thread *cur_t = list_entry(next, struct thread, all_elem);
-    int Pri_max_m_r = fixed_sub_int(int_to_fixed(PRI_MAX), fixed_div(cur_t->recent_cpu *F, 4*F));
-    cur_t->priority = fixed_sub_int(int_to_fixed(Pri_max_m_r), fixed_mul(cur_t->nice * F, 2 * F));
-    next = list_next(e);
+void calc_priority(struct thread *cur) {
+  // In every fourth tick, recompute the priority of all threads
+  // priority = PRI_MAX – (recent_cpu / 4) – (nice * 2)
+  if (cur == idle_thread) return;
+  int tmp = fixed_to_int_trunc(fixed_add_int(fixed_div_int(cur->recent_cpu, -4),
+                                             PRI_MAX - cur->nice * 2));
+  if (tmp > PRI_MAX) {
+    tmp = PRI_MAX;
+  } else if (tmp < PRI_MIN) {
+    tmp = PRI_MIN;
   }
-}
-void
-calc_recent_cpu(void){
-  struct thread *cur = thread_current();
-  if(cur == idle_thread) return;
-  int prev = cur->recent_cpu;
-  cur->recent_cpu = fixed_mul(calc_decay(), prev) - fixed_mul(cur->nice*F, 2*F);
+  cur->priority = tmp;
 }
 
-int calc_decay(void){
-  int load_m_2 = fixed_mul(calc_load_avg(),2*F);
-  return fixed_div(load_m_2, fixed_add_int(load_m_2, 1));
+void recalc_priority() {
+  // In every fourth tick, recompute the priority of all threads
+  // priority = PRI_MAX – (recent_cpu / 4) – (nice * 2)
+  struct list_elem *e;
+  struct thread *cur;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    cur = list_entry(e, struct thread, all_elem);
+    calc_priority(cur);
+  }
 }
 // ready_list에서 대기중인 쓰레드와 실행중인 쓰레드의 갯수
-int calc_load_avg(void){
-  struct list_elem *e, *next;
-  size_t ready_threads;
+void calc_load_avg(void) {
+  int ready_threads;
 
   if (thread_current() == idle_thread) {
     ready_threads = list_size(&ready_list);
+    //printf("1=>(%d)\n", ready_threads);
   } else {
     ready_threads = list_size(&ready_list) + 1;
+    //printf("2=>(%d)\n", ready_threads);
   }
-   
-  load_avg = fixed_add(fixed_mul(int_to_fixed(fixed_div(int_to_fixed(59),int_to_fixed(60))), load_avg),
-  fixed_mul(int_to_fixed(fixed_div(int_to_fixed(1),int_to_fixed(60))), ready_threads)) ;
-  return;
+
+  load_avg = fixed_add(
+      fixed_mul(fixed_div(int_to_fixed(59), int_to_fixed(60)), load_avg),
+      fixed_mul(fixed_div(int_to_fixed(1), int_to_fixed(60)), ready_threads));
 }
 
-void
-incr_recent_cpu(void){
-	thread_current()->recent_cpu++;
+void calc_recent_cpu(struct thread *cur) {
+  if (cur == idle_thread) return;
+  int tmp = fixed_mul_int(load_avg, 2);
+  int decay = fixed_div(tmp, fixed_add_int(tmp, 1));
+  int ret = fixed_add_int(fixed_mul(decay, cur->recent_cpu), cur->nice);
+  if ((ret >> 31) == (-1) >> 31) {
+    ret = 0;
+  }
+  cur->recent_cpu = ret;
+}
+void re_recent_cpu(void) {
+  // In every second, update every thread’s recent_cpu
+  // recent_cpu = decay * recent_cpu + nice,
+  struct list_elem *e;
+  struct thread *cur;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+    cur = list_entry(e, struct thread, all_elem);
+    calc_recent_cpu(cur);
+  }
+}
+
+void incr_recent_cpu(void) {
+  struct thread *cur = thread_current();
+  cur->recent_cpu = fixed_add_int(cur->recent_cpu, 1);
 }

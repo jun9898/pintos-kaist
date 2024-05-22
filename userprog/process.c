@@ -173,11 +173,26 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
+	// Argument Passing
+    char *parse[64];
+    char *token, *save_ptr;
+    int count = 0;
+    for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+        parse[count++] = token;
+    
+
 	/* We first kill the current context */
 	process_cleanup ();
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+
+	// Argument Passing
+    argument_stack(parse, count, &_if.rsp);
+    _if.R.rdi = count;
+    _if.R.rsi = (char *)_if.rsp + 8;
+
+    hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true); 
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -187,6 +202,49 @@ process_exec (void *f_name) {
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
+}
+
+/**
+ * &_if.rsp : 포인터의 주소 -> **rsp
+*/
+void 
+argument_stack(char **parse, int count, void **rsp) {
+    // Arguments (String)
+    for (int i = count - 1; i > -1; i--) {
+        int len = strlen(parse[i]) + 1; // NULL 종단 문자 포함 + 1
+        *rsp -= len;
+        memcpy(*rsp, parse[i], len);
+        parse[i] = (char **)*rsp; // 주소 저장
+		/**
+		 * *rsp : 주소
+		 * char * 형을 가리키는 포인터 : char **
+		*/
+    }
+
+    // Padding
+    uintptr_t sp = (uintptr_t)*rsp;
+    int padding = sp % 8;
+    if (padding != 0) {
+        *rsp -= padding;
+        memset((uint8_t *)*rsp, 0, sizeof(uint8_t) * padding); // Padding 0으로 설정
+    }
+
+	// Argument's address
+    *rsp -= 8; // Null pointer sentinel (argv[argc])
+    *(char **)*rsp = 0;
+
+    for (int i = count - 1; i > -1; i--) {
+        *rsp -= 8;
+        *(char **)*rsp = parse[i];
+		/**
+		 * char *형을 가리키는 포인터 *rsp -> (char **)*rsp
+		 * 해당 포인터가 가리키는 값에 parse[i] 저장
+		*/
+    }
+
+    // return address (fake address)
+    *rsp -= 8;
+    *(void ***)*rsp = 0;
 }
 
 
@@ -204,6 +262,9 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	for (int i = 0; i < 100000000; i++)
+  	{
+  	}
 	return -1;
 }
 

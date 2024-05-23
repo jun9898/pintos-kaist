@@ -59,3 +59,7 @@ exit(int status) {
 	printf("%s: exit(%d)\n", cur->name, status);
 	thread_exit();
 }
+
+bool create(const char *file, unsigned initial_size) {
+	return filesys_create(file, initial_size);
+}

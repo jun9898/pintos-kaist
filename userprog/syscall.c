@@ -66,7 +66,10 @@ exit(int status) {
 	thread_exit();
 }
 
-bool create(const char *file, unsigned initial_size) {
+bool 
+create(const char *file, unsigned initial_size) {
+	check_addr_valid(file);
 	return filesys_create(file, initial_size);
 }
+
 

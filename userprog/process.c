@@ -244,7 +244,7 @@ argument_stack(char **parse, int count, void **rsp) {
 
     // return address (fake address)
     *rsp -= 8;
-    *(void ***)*rsp = 0;
+    *(void **)*rsp = 0;
 }
 
 

@@ -77,3 +77,12 @@ remove(const char *file) {
 	check_addr_valid(file);
 	return filesys_remove(file);
 }
+
+int 
+open (const char *file) {
+	// 예외 처리 필요
+	struct thread *cur = thread_current();
+	struct file *_file = filesys_open(file);
+	int fd = process_add_file(_file);
+	return fd;
+}

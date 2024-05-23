@@ -12,5 +12,7 @@ void process_activate (struct thread *next);
 
 // Implements
 int process_add_file(struct file *file);
+struct file *process_get_file(int fd);
+void process_close_file(int fd);
 
 #endif /* userprog/process.h */

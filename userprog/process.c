@@ -649,6 +649,26 @@ process_add_file(struct file *file) {
 	return cur->next_fd;
 }
 
+struct file *process_get_file(int fd) {
+	struct thread *cur = thread_current();
+
+	if (cur->fdt[fd]) 
+		return cur->fdt[fd];
+	else
+		return NULL;
+}
+
+void process_close_file(int fd) {
+	struct thread *cur = thread_curent();
+	struct file *file = cur->fdt[fd];
+
+	if (file) {
+		file_close(file);
+		cur->fdt[fd] = NULL;
+	} else
+		exit(-1);
+}
+
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the

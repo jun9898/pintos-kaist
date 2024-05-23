@@ -7,6 +7,8 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "process.h"
+#include "filesys/filesys.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -49,4 +51,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 void
 halt(void) {
 	power_off();
+}
+
+void
+exit(int status) {
+	struct thread *cur = thread_current();
+	printf("%s: exit(%d)\n", cur->name, status);
+	thread_exit();
 }

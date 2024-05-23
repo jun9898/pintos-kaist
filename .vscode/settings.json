@@ -6,6 +6,9 @@
         "synch.h": "c",
         "fixed_point.h": "c",
         "__config": "c",
-        "algorithm": "c"
+        "algorithm": "c",
+        "process.h": "c",
+        "filesys.h": "c",
+        "input.h": "c"
     }
 }

@@ -636,38 +636,45 @@ install_page (void *upage, void *kpage, bool writable) {
  * 	→ 커널 내 해당 프로세스(쓰레드)의 공간에 위치한 fdt에 
  * 	  해당 프로세스의 파일 디스크립터 숫자 중 사용하지 않는 가장 작은 값 할당
 */
-int
-process_add_file(struct file *file) {
-	struct thread *cur = thread_current();
-	
-	while (cur->next_fd < FDT_COUNT_LIMIT && cur->fdt[cur->next_fd]) 
-		cur->next_fd++;
-	if (cur->next_fd >= FDT_COUNT_LIMIT) 
-		return -1;
+int process_add_file(struct file *file) {
+    struct thread *cur = thread_current();
+    int start = cur->next_fd;
 
-	cur->fdt[cur->next_fd] = file;
-	return cur->next_fd;
+    do {
+        if (cur->fdt[cur->next_fd] == NULL) {
+            cur->fdt[cur->next_fd] = file;
+            return cur->next_fd;
+        }
+
+        cur->next_fd++;
+        if (cur->next_fd >= FDT_COUNT_LIMIT) {
+            cur->next_fd = 2; 
+        }
+    } while (cur->next_fd != start);
+
+    return -1;
 }
+
 
 struct file *process_get_file(int fd) {
-	struct thread *cur = thread_current();
+	if (fd < 2 || fd >= FDT_COUNT_LIMIT) return NULL;
+	// thread_current()가 NULL이 될 수 있나?
+	return thread_current()->fdt[fd];
+}
 
-	if (cur->fdt[fd]) 
-		return cur->fdt[fd];
-	else
+void process_close_file(int fd)
+{
+	if (fd < 2 || fd >= FDT_COUNT_LIMIT)
 		return NULL;
+	
+	struct thread *cur = thread_current();
+	struct file *file = process_get_file(fd);
+	if (!file) return NULL;
+	file_close(file);
+
+	cur->fdt[fd] = NULL;
 }
 
-void process_close_file(int fd) {
-	struct thread *cur = thread_curent();
-	struct file *file = cur->fdt[fd];
-
-	if (file) {
-		file_close(file);
-		cur->fdt[fd] = NULL;
-	} else
-		exit(-1);
-}
 
 #else
 /* From here, codes will be used after project 3.

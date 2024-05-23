@@ -10,6 +10,8 @@
 #include "vm/vm.h"
 #endif
 
+#define USERPROG
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -32,7 +34,7 @@ typedef int tid_t;
 #define NICE_DEFAULT 0 
 #define LOAD_AVG_DEFAULT 0
 
-#define FDT_PAGES 2
+#define FDT_PAGES 2 // 0, 1
 #define FDT_COUNT_LIMIT 128
 
 #define TIME_SLICE 4  /* # of timer ticks to give each thread. */

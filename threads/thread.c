@@ -226,7 +226,7 @@ thread_create (const char *name, int priority,
 	
 	if (t->fdt == NULL) 
 		PANIC("Failed to allocate file descriptor table.");
-
+	
 	t->fdt[0] = stdin;
 	t->fdt[1] = stdout;
 	t->next_fd = 2;

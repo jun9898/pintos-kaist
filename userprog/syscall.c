@@ -10,6 +10,7 @@
 #include "process.h"
 #include "filesys/filesys.h"
 #include "file.h"
+#include "devices/input.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -52,7 +53,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 // Implements
 void
 check_address(char *addr) {
-	if (addr == NULL || is_kernel_vaddr(addr)) exit(-1);
+	struct thread* cur = thread_current();
+	if (addr == NULL || is_kernel_vaddr(addr) || pml4_get_page(cur->pml4, addr)) exit(-1);
 }
 
 void
@@ -98,9 +100,5 @@ filesize (int fd) {
 
 int
 read (int fd, void *buffer, unsigned size) {
-	struct file *file = process_get_file(fd);
-	check_address(file);
-	int bytes = file_read(file, buffer, size);
-	if (!bytes) return -1;
-	else return bytes;
+	// 시작
 }

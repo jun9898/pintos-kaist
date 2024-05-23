@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "init.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -42,5 +43,35 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	printf ("system call!\n");
+	uintptr_t syscall_code = f->R.rax;
+
+	switch(syscall_code) {
+
+		case SYS_HALT:
+			halt();
+			break;
+
+		case SYS_EXIT:
+			struct thread *cur = thread_current();
+			exit(cur->status);
+			break;
+
+		default:
+			printf("thread_exit()을 실행");
+			thread_exit ();
+			break;
+
+	}
+}
+
+void
+halt(void){
+	power_off();
+}
+
+void
+exit(int status){
+	
 	thread_exit ();
 }
+

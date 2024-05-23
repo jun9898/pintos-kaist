@@ -72,4 +72,8 @@ create(const char *file, unsigned initial_size) {
 	return filesys_create(file, initial_size);
 }
 
-
+bool
+remove(const char *file) {
+	check_addr_valid(file);
+	return filesys_remove(file);
+}

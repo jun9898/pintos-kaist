@@ -630,6 +630,25 @@ install_page (void *upage, void *kpage, bool writable) {
 	return (pml4_get_page (t->pml4, upage) == NULL
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
+
+/**
+ * 프로세스(쓰레드)가 실행 중 파일을 Open
+ * 	→ 커널 내 해당 프로세스(쓰레드)의 공간에 위치한 fdt에 
+ * 	  해당 프로세스의 파일 디스크립터 숫자 중 사용하지 않는 가장 작은 값 할당
+*/
+int
+process_add_file(struct file *file) {
+	struct thread *cur = thread_current();
+	
+	while (cur->next_fd < FDT_COUNT_LIMIT && cur->fdt[cur->next_fd]) 
+		cur->next_fd++;
+	if (cur->next_fd >= FDT_COUNT_LIMIT) 
+		return -1;
+
+	cur->fdt[cur->next_fd] = file;
+	return cur->next_fd;
+}
+
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the

@@ -4,6 +4,8 @@
         "inttypes.h": "c",
         "stddef.h": "c",
         "synch.h": "c",
-        "fixed_point.h": "c"
+        "fixed_point.h": "c",
+        "__config": "c",
+        "algorithm": "c"
     }
 }

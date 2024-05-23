@@ -220,6 +220,16 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	
+	// File descriptor table initialize
+	t -> fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	
+	if (t->fdt == NULL) 
+		PANIC("Failed to allocate file descriptor table.");
+
+	t->fdt[0] = stdin;
+	t->fdt[1] = stdout;
+	t->next_fd = 2;
 
 	list_push_back(&all_list, &t->all_elem);
 	/* Add to run queue. */

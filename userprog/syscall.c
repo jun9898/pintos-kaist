@@ -9,6 +9,7 @@
 #include "intrinsic.h"
 #include "process.h"
 #include "filesys/filesys.h"
+#include "file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -86,3 +87,10 @@ open (const char *file) {
 	int fd = process_add_file(_file);
 	return fd;
 }
+
+int filesize (int fd) {
+	struct file *file = process_get_file(fd);
+	if (!file) return -1;
+	return file_length(file);
+}
+

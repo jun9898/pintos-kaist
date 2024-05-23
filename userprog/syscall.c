@@ -69,13 +69,13 @@ exit(int status) {
 
 bool 
 create(const char *file, unsigned initial_size) {
-	check_addr_valid(file);
+	check_address(file);
 	return filesys_create(file, initial_size);
 }
 
 bool
 remove(const char *file) {
-	check_addr_valid(file);
+	check_address(file);
 	return filesys_remove(file);
 }
 
@@ -84,6 +84,7 @@ open (const char *file) {
 	// 예외 처리 필요
 	struct thread *cur = thread_current();
 	struct file *_file = filesys_open(file);
+	check_address(file);
 	int fd = process_add_file(_file);
 	return fd;
 }
@@ -91,13 +92,14 @@ open (const char *file) {
 int 
 filesize (int fd) {
 	struct file *file = process_get_file(fd);
-	if (!file) return -1;
+	check_address(file);
 	return file_length(file);
 }
 
 int
 read (int fd, void *buffer, unsigned size) {
 	struct file *file = process_get_file(fd);
+	check_address(file);
 	int bytes = file_read(file, buffer, size);
 	if (!bytes) return -1;
 	else return bytes;

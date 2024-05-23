@@ -13,7 +13,7 @@
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
-void check_addr_valid(char *addr);
+void check_address(char *addr);
 
 /* System call.
  *
@@ -51,8 +51,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 // Implements
 void
-check_addr_valid(char *addr) {
-	if (addr == NULL || !is_kernel_vaddr(addr)) exit(-1);
+check_address(char *addr) {
+	if (addr == NULL || is_kernel_vaddr(addr)) exit(-1);
 }
 
 void
@@ -88,9 +88,17 @@ open (const char *file) {
 	return fd;
 }
 
-int filesize (int fd) {
+int 
+filesize (int fd) {
 	struct file *file = process_get_file(fd);
 	if (!file) return -1;
 	return file_length(file);
 }
 
+int
+read (int fd, void *buffer, unsigned size) {
+	struct file *file = process_get_file(fd);
+	int bytes = file_read(file, buffer, size);
+	if (!bytes) return -1;
+	else return bytes;
+}

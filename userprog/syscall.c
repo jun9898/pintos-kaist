@@ -12,6 +12,7 @@
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+void check_addr_valid(char *addr);
 
 /* System call.
  *
@@ -49,6 +50,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 // Implements
 void
+check_addr_valid(char *addr) {
+	if (addr == NULL || !is_kernel_vaddr(addr)) exit(-1);
+}
+
+void
 halt(void) {
 	power_off();
 }
@@ -63,3 +69,4 @@ exit(int status) {
 bool create(const char *file, unsigned initial_size) {
 	return filesys_create(file, initial_size);
 }
+

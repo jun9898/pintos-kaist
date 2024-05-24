@@ -17,6 +17,9 @@ void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void check_address(char *addr);
 
+// File synch
+struct lock filesys_lock;
+
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -41,6 +44,8 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -155,8 +160,13 @@ int
 read (int fd, void *buffer, unsigned size) {
 	int count = 0;
 	unsigned char *bufp = buffer;
+	
+	lock_acquire(&filesys_lock);
 	struct file* file = process_get_file(fd);
-	if (file == NULL) return -1;
+	if (file == NULL) {
+		lock_release(&filesys_lock);
+		return -1;
+	}
 
 	if (fd == 0) {
 		char key;
@@ -169,15 +179,20 @@ read (int fd, void *buffer, unsigned size) {
 	} else {
 		count = file_read(file, buffer, size);
 	}
-
+	lock_release(&filesys_lock);
 	return count;
 }
 
 int
 write (int fd, const void *buffer, unsigned size) {
 	int count;
+
+	lock_acquire(&filesys_lock);
 	struct file* file = process_get_file(fd);
-	if (file == NULL) return -1;
+	if (file == NULL) {
+		lock_release(&filesys_lock);
+		return -1;
+	}
 	
 	if (fd == 1) {
 		putbuf(buffer, size);
@@ -186,6 +201,8 @@ write (int fd, const void *buffer, unsigned size) {
 	else {
 		count = file_write(file, buffer, size);
 	}
+	lock_release(&filesys_lock);
+	return count;
 }
 
 void seek(int fd, unsigned position)

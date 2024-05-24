@@ -100,5 +100,23 @@ filesize (int fd) {
 
 int
 read (int fd, void *buffer, unsigned size) {
-	// 시작
+	int count = 0;
+	unsigned char *bufp = buffer;
+	struct file* file = process_get_file(fd);
+	if (file == NULL) return -1;
+
+	if (fd == 0) {
+		char key;
+		for (int count = 0; count < size; count++) {
+				key  = input_getc();
+				*bufp++ = key;
+			if (key == '\0') 
+				break;
+		}
+	} else {
+		count = file_read(file, buffer, size);
+	}
+
+	return count;
 }
+

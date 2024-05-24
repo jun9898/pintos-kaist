@@ -675,7 +675,6 @@ void process_close_file(int fd)
 	cur->fdt[fd] = NULL;
 }
 
-
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the

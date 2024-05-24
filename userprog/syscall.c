@@ -101,7 +101,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 	}
 	// thread_exit ();
-	thread_exit ();
 }
 
 // Implements
@@ -189,5 +188,24 @@ write (int fd, const void *buffer, unsigned size) {
 	}
 }
 
+void seek(int fd, unsigned position)
+{
+	struct file *file = process_get_file(fd);
+	if (file == NULL)
+		return;
+	file_seek(file, position);
+}
 
+unsigned tell(int fd)
+{
+	struct file *file = process_get_file(fd);
+	if (file == NULL)
+		return;
+	return file_tell(file);
+}
+
+void close(int fd)
+{
+	process_close_file(fd);
+}
 

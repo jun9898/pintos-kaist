@@ -9,6 +9,9 @@
         "algorithm": "c",
         "process.h": "c",
         "filesys.h": "c",
-        "input.h": "c"
+        "input.h": "c",
+        "interrupt.h": "c",
+        "syscall-nr.h": "c",
+        "stdio.h": "c"
     }
 }

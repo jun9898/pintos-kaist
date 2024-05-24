@@ -11,6 +11,7 @@
 #include "filesys/filesys.h"
 #include "file.h"
 #include "devices/input.h"
+#include "../lib/kernel/console.c"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -119,4 +120,20 @@ read (int fd, void *buffer, unsigned size) {
 
 	return count;
 }
+
+int
+write (int fd, void *buffer, unsigned size) {
+	int count;
+	struct file* file = process_get_file(fd);
+	if (file == NULL) return -1;
+	
+	if (fd == 1) {
+		putbuf(buffer, size);
+		count = size;
+	}
+	else {
+		count = file_write(file, buffer, size);
+	}
+}
+
 

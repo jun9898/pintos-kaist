@@ -50,6 +50,10 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+    char *save_ptr;
+    
+	file_name = strtok_r(file_name, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -192,7 +196,7 @@ process_exec (void *f_name) {
     _if.R.rdi = count;
     _if.R.rsi = (char *)_if.rsp + 8;
 
-    hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true); 
+    // hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true); 
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -262,7 +266,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for (int i = 0; i < 100000000; i++)
+	for (int i = 0; i < 500000000; i++)
   	{
   	}
 	return -1;
@@ -271,7 +275,7 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
+	struct thread *cur = thread_current ();
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
@@ -658,7 +662,6 @@ int process_add_file(struct file *file) {
 
 struct file *process_get_file(int fd) {
 	if (fd < 2 || fd >= FDT_COUNT_LIMIT) return NULL;
-	// thread_current()가 NULL이 될 수 있나?
 	return thread_current()->fdt[fd];
 }
 
@@ -669,10 +672,10 @@ void process_close_file(int fd)
 	
 	struct thread *cur = thread_current();
 	struct file *file = process_get_file(fd);
-	if (!file) return NULL;
-	file_close(file);
+	if (file == NULL) return NULL;
 
 	cur->fdt[fd] = NULL;
+	file_close(file);
 }
 
 #else

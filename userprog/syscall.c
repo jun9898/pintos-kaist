@@ -49,70 +49,70 @@ syscall_init (void) {
 }
 
 /* The main system call interface */
-void
-syscall_handler (struct intr_frame *f UNUSED) {
-	// TODO: Your implementation goes here.
-	printf ("system call!\n");
-		char *fn_copy;
-
-	// x86-64 호출 규약
-	switch (f->R.rax) {		
-		case SYS_HALT:
-			halt();			
-			break;
-		case SYS_EXIT:
-			exit(f->R.rdi);	
-			break;
-		case SYS_FORK:
-			f->R.rax = fork(f->R.rdi);
-			break;
-		case SYS_EXEC:
-			if (exec(f->R.rdi) == -1) {
-				exit(-1);
-			}
-			break;
-		case SYS_WAIT:
-			f->R.rax = process_wait(f->R.rdi);
-			break;
-		case SYS_CREATE:
-			f->R.rax = create(f->R.rdi, f->R.rsi);
-			break;
-		case SYS_REMOVE:
-			f->R.rax = remove(f->R.rdi);
-			break;
-		case SYS_OPEN:
-			f->R.rax = open(f->R.rdi);
-			break;
-		case SYS_FILESIZE:
-			f->R.rax = filesize(f->R.rdi);
-			break;
-		case SYS_READ:
-			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
-			break;
-		case SYS_WRITE:
-			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
-			break;
-		case SYS_SEEK:
-			seek(f->R.rdi, f->R.rsi);
-			break;
-		case SYS_TELL:
-			f->R.rax = tell(f->R.rdi);
-			break;
-		case SYS_CLOSE:
-			close(f->R.rdi);
-			break;
-		default:
-			exit(-1);
-			break;
+void syscall_handler(struct intr_frame *f UNUSED)
+{
+#ifdef VM
+	thread_current()->rsp = f->rsp;
+#endif
+	switch (f->R.rax)
+	{
+	case SYS_HALT:
+		halt();
+		break;
+	case SYS_EXIT:
+		exit(f->R.rdi);
+		break;
+	// case SYS_FORK:
+	// 	f->R.rax = fork(f->R.rdi, f);
+	// 	break;
+	// case SYS_EXEC:
+	// 	f->R.rax = exec(f->R.rdi);
+	// 	break;
+	// case SYS_WAIT:
+	// 	f->R.rax = wait(f->R.rdi);
+	// 	break;
+	case SYS_CREATE:
+		f->R.rax = create(f->R.rdi, f->R.rsi);
+		break;
+	case SYS_REMOVE:
+		f->R.rax = remove(f->R.rdi);
+		break;
+	case SYS_OPEN:
+		f->R.rax = open(f->R.rdi);
+		break;
+	case SYS_FILESIZE:
+		f->R.rax = filesize(f->R.rdi);
+		break;
+	case SYS_READ:
+		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+	case SYS_WRITE:
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+	case SYS_SEEK:
+		seek(f->R.rdi, f->R.rsi);
+		break;
+	case SYS_TELL:
+		f->R.rax = tell(f->R.rdi);
+		break;
+	case SYS_CLOSE:
+		close(f->R.rdi);
+		break;
+	// case SYS_MMAP:
+	// 	f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+	// 	break;
+	// case SYS_MUNMAP:
+	// 	munmap(f->R.rdi);
+	// 	break;
 	}
-	// thread_exit ();
 }
+
 
 // Implements
 void
 check_address(char *addr) {
 	struct thread* cur = thread_current();
-	if (addr == NULL || is_kernel_vaddr(addr) || pml4_get_page(cur->pml4, addr)) exit(-1);
+	if (addr == NULL || !is_user_vaddr(addr) || pml4_get_page(cur->pml4, addr) == NULL) exit(-1);
 }
 
 void
@@ -141,12 +141,14 @@ remove(const char *file) {
 
 int 
 open (const char *file) {
-	// 예외 처리 필요
-	struct thread *cur = thread_current();
-	struct file *_file = filesys_open(file);
 	check_address(file);
+	struct file *_file = filesys_open(file);
+	if (file == NULL)
+		return -1;
 	int fd = process_add_file(_file);
-	return fd;
+	if (fd == -1) 
+		file_close(_file);
+	return process_add_file(_file);
 }
 
 int 
@@ -159,6 +161,7 @@ filesize (int fd) {
 int
 read (int fd, void *buffer, unsigned size) {
 	int count = 0;
+	check_address(buffer);
 	unsigned char *bufp = buffer;
 	
 	lock_acquire(&filesys_lock);
@@ -186,21 +189,22 @@ read (int fd, void *buffer, unsigned size) {
 int
 write (int fd, const void *buffer, unsigned size) {
 	int count;
-
+	check_address(buffer);
 	lock_acquire(&filesys_lock);
+	if (fd == 1) {
+		putbuf(buffer, size);
+		lock_release(&filesys_lock);
+		return size;
+	}
+
 	struct file* file = process_get_file(fd);
 	if (file == NULL) {
 		lock_release(&filesys_lock);
 		return -1;
 	}
 	
-	if (fd == 1) {
-		putbuf(buffer, size);
-		count = size;
-	}
-	else {
-		count = file_write(file, buffer, size);
-	}
+	count = file_write(file, buffer, size);
+	
 	lock_release(&filesys_lock);
 	return count;
 }

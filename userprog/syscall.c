@@ -7,11 +7,11 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
-#include "process.h"
+#include "userprog/process.h"
 #include "filesys/filesys.h"
-#include "file.h"
+#include "filesys/file.h"
 #include "devices/input.h"
-#include "../lib/kernel/console.c"
+#include "lib/kernel/stdio.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -48,6 +48,59 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	printf ("system call!\n");
+		char *fn_copy;
+
+	// x86-64 호출 규약
+	switch (f->R.rax) {		
+		case SYS_HALT:
+			halt();			
+			break;
+		case SYS_EXIT:
+			exit(f->R.rdi);	
+			break;
+		case SYS_FORK:
+			f->R.rax = fork(f->R.rdi);
+			break;
+		case SYS_EXEC:
+			if (exec(f->R.rdi) == -1) {
+				exit(-1);
+			}
+			break;
+		case SYS_WAIT:
+			f->R.rax = process_wait(f->R.rdi);
+			break;
+		case SYS_CREATE:
+			f->R.rax = create(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_REMOVE:
+			f->R.rax = remove(f->R.rdi);
+			break;
+		case SYS_OPEN:
+			f->R.rax = open(f->R.rdi);
+			break;
+		case SYS_FILESIZE:
+			f->R.rax = filesize(f->R.rdi);
+			break;
+		case SYS_READ:
+			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_WRITE:
+			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_SEEK:
+			seek(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_TELL:
+			f->R.rax = tell(f->R.rdi);
+			break;
+		case SYS_CLOSE:
+			close(f->R.rdi);
+			break;
+		default:
+			exit(-1);
+			break;
+	}
+	// thread_exit ();
 	thread_exit ();
 }
 
@@ -122,7 +175,7 @@ read (int fd, void *buffer, unsigned size) {
 }
 
 int
-write (int fd, void *buffer, unsigned size) {
+write (int fd, const void *buffer, unsigned size) {
 	int count;
 	struct file* file = process_get_file(fd);
 	if (file == NULL) return -1;
@@ -135,5 +188,6 @@ write (int fd, void *buffer, unsigned size) {
 		count = file_write(file, buffer, size);
 	}
 }
+
 
 

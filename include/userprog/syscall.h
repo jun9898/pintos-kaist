@@ -1,7 +1,6 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
-#include <sys/types.h>
 #include <stdbool.h>
 
 void syscall_init (void);
@@ -9,9 +8,9 @@ void syscall_init (void);
 // Implements
 void halt (void);
 void exit (int status);
-pid_t fork (const char *thread_name);
+int fork (const char *thread_name);
 int exec (const char *cmd_line);
-int wait (pid_t pid);
+int wait (int pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);

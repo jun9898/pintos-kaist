@@ -1,3 +1,4 @@
+#define USERPROG
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 
@@ -31,6 +32,12 @@ typedef int tid_t;
 #define RECENT_CPU_DEFAULT 0                  /* Default priority. */
 #define NICE_DEFAULT 0                      /* Highest priority. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
+
+#define FDT_PAGES 2
+#define FDT_COUNT_LIMIT 128
+
+// custom define
+#define thread_entry(tid) ((struct thread*) &tid)
 
 /* A kernel thread or user process.
  *
@@ -101,7 +108,9 @@ struct thread {
 	struct lock *wait_on_lock;			// 내가 필요로 하는 리소스를 저장하는 lock
 	struct list donations;
 	struct list_elem d_elem;              /* List element. */
-
+	// FDT
+	struct file **fdt;
+	int next_fd;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	struct list_elem all_elem;
@@ -170,4 +179,6 @@ void calc_load_avg(void);
 void incr_recent_cpu(void);
 void update_recent_cpu();
 void update_priority();
+
+
 #endif /* threads/thread.h */

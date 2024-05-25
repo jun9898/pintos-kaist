@@ -31,6 +31,10 @@ static void __do_fork(void *);
 
 /* General process initializer for initd and other process. */
 static void process_init(void) { struct thread *current = thread_current(); }
+/* custom */
+static void argument_stack(char *argv[], int argc, struct intr_frame *if_);
+void process_exit_file(void);
+int process_add_file(struct file *f);
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
  * The new thread may be scheduled (and may even exit)
@@ -147,47 +151,91 @@ error:
   thread_exit();
 }
 // custom fn
-static void
-argument_stack(char *argv[],int argc, struct intr_frame *if_){
+// static void argument_stack(char *argv[], int argc, struct intr_frame *if_) {
+//   // 인자들의 주소를 저장할 공간
+//   char *argv_addr[argc];
 
-  // 인자들의 주소를 저장할 공간
-  char *argv_addr[128];
+//   // 유저스택에서 스택포인터를 >>8bite 내림(수정)>> 처음들어가는 크기만큼
+//   내림
+//   // if_->rsp -= sizeof(int64_t);
 
-  // 유저스택에서 스택포인터를 >>8bite 내림(수정)>> 처음들어가는 크기만큼 내림
-  // if_->rsp -= sizeof(int64_t);
+//   for (int i = argc - 1; i >= 0; i--) {
+//     size_t len = (strlen(argv[i]) + 1);
+//     if_->rsp -= len;
+//     memcpy(if_->rsp, argv[i],
+//            len);  //-- strcpy vs memcpy 체크 -> strcpy는 \0 포함 X
+//     argv_addr[i] = if_->rsp;
+//   }
 
+//   // 8bite 정렬을 위해 남은부분을 0으로 채워줌
+//   while (if_->rsp % 8 != 0) {
+//     if_->rsp -= sizeof(uint8_t);
+//     memset(if_->rsp, 0, sizeof(uint8_t));
+//   }
+
+//   // 저장해뒀던 인자들의 주소를 넣어준다.
+//   for (int i = argc; i >= 0; i--) {
+//     if_->rsp -= sizeof(char *);
+//     if (i == argc)
+//       memset(if_->rsp, 0, sizeof(char *));
+//     else
+//       memcpy(if_->rsp, &argv_addr[i], sizeof(char *));
+//   }
+
+//   // rdi -> 인자갯수, rsi -> argv[0]의 주소값
+//   if_->R.rdi = argc;
+//   if_->R.rsi = if_->rsp;
+
+//   // return 주소값
+//   if_->rsp -= sizeof(uintptr_t);
+//   memset(if_->rsp, 0, sizeof(uintptr_t));
+// }
+static void argument_stack(char *argv[], int argc, struct intr_frame *if_) {
+  /* Tokenize the args! */
+  uintptr_t argv_addr[argc];
+
+  // // USER_STACK;
+  // USER_STACK = 0x47480000 따라서 여기서부터 빼주면 되겠네
+  // Push the address of each string plus a null pointer sentinel, on the stack,
+  // in right-to-left order. 위의 제약조건 때문에 i를 0부터 하지 않고,
+  // 끝에서부터 (argc-1) 부터 시작.
   for (int i = argc - 1; i >= 0; i--) {
-    size_t len = (strlen(argv[i]) + 1);
+    size_t len = strlen(argv[i]) + 1;  // Null 종단자 포함해야함. 따라서 +1
     if_->rsp -= len;
+    memcpy(if_->rsp, argv[i], len);
     argv_addr[i] = if_->rsp;
-    memcpy(if_->rsp, argv[i], len);  //-- strcpy vs memcpy 체크 -> strcpy는 \0 포함 X
+  }
+  /* uint8_t 타입은 워드 정렬과 관련된 용도로 일반적으로 사용되는 타입입니다.
+  따라서 코드 가독성을 위해 uint8_t 타입을 사용하는 것이 좋습니다. */
+
+  /* Word-aligned accesses are faster than unaligned accesses,
+  so for best performance round the stack pointer down to a multiple of 8 before
+  the first push. */
+
+  /* | Name       | Data |  Type 	    | */
+  /* | word-align |   0  |  uint8_t[] | */
+  while ((if_->rsp % 8) != 0) {  // 8배수 패딩
+    if_->rsp--;
+    memset(if_->rsp, 0, sizeof(uint8_t));  // 그렇다면, 패딩 부분도 모두 0으로
+                                           // 만들어야 푸쉬가 제대로 되는건가..?
   }
 
-
-  // 8bite 정렬을 위해 남은부분을 0으로 채워줌
-  while (if_->rsp % 8 != 0) {
-    if_->rsp-= sizeof(uint8_t);
-    memset(if_->rsp, 0, sizeof(uint8_t));  //--자료형 체크 -> 일단 넘어가
-  }
-
-  // 저장해뒀던 인자들의 주소를 넣어준다.
   for (int i = argc; i >= 0; i--) {
-    if_->rsp -= sizeof(char *);
-    if (i == argc)
-      memset(if_->rsp, 0, sizeof(char *));
-    else
-      memcpy(if_->rsp, &argv_addr[i], sizeof(char *));
+    if_->rsp -= sizeof(uintptr_t);
+    if (i == argc) {
+      memset(if_->rsp, 0, sizeof(uintptr_t));
+    } else {
+      memcpy(if_->rsp, &argv_addr[i], sizeof(uintptr_t));
+    }
   }
-
-  // rdi -> 인자갯수, rsi -> argv[0]의 주소값
-  if_->R.rdi = argc;
+  /* 4 번 단계 */
   if_->R.rsi = if_->rsp;
+  if_->R.rdi = argc;
 
-  // return 주소값
+  /* 5번 단계 */
   if_->rsp -= sizeof(uintptr_t);
   memset(if_->rsp, 0, sizeof(uintptr_t));
 }
-
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int process_exec(void *f_name) {
@@ -208,16 +256,16 @@ int process_exec(void *f_name) {
   char *argv[128];
   int argc = 0;
 
-  for(token = strtok_r(file_name, " ", &save_ptr); token != NULL; token=strtok_r(NULL, " ", &save_ptr)){
-	argv[argc++] = token;
+  for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+       token = strtok_r(NULL, " ", &save_ptr)) {
+    argv[argc++] = token;
   }
   /* And then load the binary */
   success = load(file_name, &_if);
-  
+
   argument_stack(&argv, argc, &_if);
 
-  hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
+  // hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
   /* If load failed, quit. */
   palloc_free_page(file_name);
@@ -241,33 +289,48 @@ int process_wait(tid_t child_tid UNUSED) {
   /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
    * XXX:       to add infinite loop here before
    * XXX:       implementing the process_wait. */
-  for (int i = 0; i < 1000000000; i++) {
+  for (int i = 0; i < 500000000; i++) {
   }
   return -1;
 }
 // custom functions
-void process_close_file (int fd){
+void process_exit_file(void) {
+  struct thread *cur = thread_current();
+  for (int i = 2; i <= 128; i++) {
+    if (cur->fdt[i] != NULL) {
+      process_close_file(i);
+    }
+  }
+}
+void process_close_file(int fd) {
   // 파일 디스크립터에 해당하는 파일을 닫고 해당 엔트리 초기화.
   // 파일 닫기
+  if (fd < 2 || fd > 128 || fd == NULL) return NULL;
   struct thread *curr = thread_current();
-  curr->status = THREAD_BLOCKED; // 현재 쓰레드를 중단하여 안전하게 자원 해제 작업을 수행.
-  struct file *f = curr->fdt[fd];
-  file_close(curr->fdt[fd]);
+  struct file *open_file = process_get_file(fd);
+  if (open_file == NULL) return NULL;
+
   curr->fdt[fd] = NULL;
+  file_close(open_file);
 }
-struct file *process_get_file(int fd){
+struct file *process_get_file(int fd) {
   // 프로세스의 파일 디스크립터 테이블을 검색하여 파일 객체의 주소를 리턴.
   struct thread *curr = thread_current();
-  if (curr->fdt[fd] == NULL)
-    return NULL;
+  if (fd > 128 || fd < 2) return NULL;
   return curr->fdt[fd];
 }
-int process_add_file (struct file *f){
+int process_add_file(struct file *f) {
   // 파일 객체에 대한 파일 디스크립터 생성
   struct thread *curr = thread_current();
-  curr->fdt[curr->next_fd] = f;
-  
-  return curr->next_fd++;
+  int tmp_fd;
+  for (tmp_fd = 2; tmp_fd <= 128; tmp_fd++) {
+    if (curr->fdt[tmp_fd] == NULL) {
+      curr->fdt[tmp_fd] = f;
+      curr->next_fd = tmp_fd;
+      return curr->next_fd;
+    }
+  }
+  return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -277,14 +340,12 @@ void process_exit(void) {
    * TODO: Implement process termination message (see
    * TODO: project2/process_termination.html).
    * TODO: We recommend you to implement process resource cleanup here. */
-  for(int i = FDT_PAGES; i <= FDT_COUNT_LIMIT ; i++){
+  for (int i = FDT_PAGES; i <= FDT_COUNT_LIMIT; i++) {
     process_close_file(i);
     curr->fdt[i] = NULL;
   }
-  curr->next_fd = FDT_PAGES;
   process_cleanup();
 }
-
 
 /* Free the current process's resources. */
 static void process_cleanup(void) {
@@ -473,8 +534,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
 
   /* TODO: Your code goes here.
    * TODO: Implement argument passing (see project2/argument_passing.html). */
-  
-
 
   success = true;
 

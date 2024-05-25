@@ -10,7 +10,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "threads/fixed_point.h";
+#include "threads/fixed_point.h"
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -20,7 +20,6 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-
 /* Random value for basic thread
    Do not modify this value. */
 #define THREAD_BASIC 0xd42df210
@@ -149,7 +148,7 @@ thread_init (void) {
 	list_init (&sleep_list);		// 준비된 슬립리스트를 초기화한다.
 	list_init (&all_list);			// all_list를 초기화한다.
 	list_init (&destruction_req);	// 스레드 파괴 요청 목록을 초기화한다.
-
+	
 	// 실행중인 스레드에 대한 스레드 구조체를 생성한다.
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();					// 현재 실행중인 스레드를 가져온다.
@@ -252,7 +251,15 @@ thread_create (const char *name, int priority,
 	t->tf.es = SEL_KDSEG;						// 확장 세그먼트 레지스터 설정
 	t->tf.ss = SEL_KDSEG;						// 스택 세그먼트 레지스터 설정
 	t->tf.cs = SEL_KCSEG;						// 코드 세그먼트 레지스터 설정
-	t->tf.eflags = FLAG_IF;						// 인터럽트 플래그 설정
+	t->tf.eflags = FLAG_IF;					// 인터럽트 플래그 설정
+
+	t->fdt = palloc_get_multiple(PAL_ZERO, 2); 
+	if (t->fdt == NULL)
+		return TID_ERROR;
+	t->fdt[0] = 0;
+	t->fdt[1] = 1;
+	t->next_fd = 2;
+
 
 	// 현재 진행중인 쓰레드와 우선순위 비교하고
 	// 만약 새로 추가된 쓰레드의 우선위가 더 크면 status를 Running으로 변경하고 

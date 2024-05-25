@@ -245,6 +245,30 @@ int process_wait(tid_t child_tid UNUSED) {
   }
   return -1;
 }
+// custom functions
+void process_close_file (int fd){
+  // 파일 디스크립터에 해당하는 파일을 닫고 해당 엔트리 초기화.
+  // 파일 닫기
+  struct thread *curr = thread_current();
+  curr->status = THREAD_BLOCKED; // 현재 쓰레드를 중단하여 안전하게 자원 해제 작업을 수행.
+  struct file *f = curr->fdt[fd];
+  file_close(curr->fdt[fd]);
+  curr->fdt[fd] = NULL;
+}
+struct file *process_get_file(int fd){
+  // 프로세스의 파일 디스크립터 테이블을 검색하여 파일 객체의 주소를 리턴.
+  struct thread *curr = thread_current();
+  if (curr->fdt[fd] == NULL)
+    return NULL;
+  return curr->fdt[fd];
+}
+int process_add_file (struct file *f){
+  // 파일 객체에 대한 파일 디스크립터 생성
+  struct thread *curr = thread_current();
+  curr->fdt[curr->next_fd] = f;
+  
+  return curr->next_fd++;
+}
 
 /* Exit the process. This function is called by thread_exit (). */
 void process_exit(void) {
@@ -253,9 +277,14 @@ void process_exit(void) {
    * TODO: Implement process termination message (see
    * TODO: project2/process_termination.html).
    * TODO: We recommend you to implement process resource cleanup here. */
-
+  for(int i = FDT_PAGES; i <= FDT_COUNT_LIMIT ; i++){
+    process_close_file(i);
+    curr->fdt[i] = NULL;
+  }
+  curr->next_fd = FDT_PAGES;
   process_cleanup();
 }
+
 
 /* Free the current process's resources. */
 static void process_cleanup(void) {

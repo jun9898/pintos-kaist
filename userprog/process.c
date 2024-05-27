@@ -91,6 +91,9 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	struct thread *child = get_child_process(tid);
 	sema_down(&child->load_sema);
 
+	if (child->exit_status == TID_ERROR)
+		return TID_ERROR;
+
 	return tid;
 }
 
@@ -185,6 +188,7 @@ __do_fork (void *aux) {
 	for (int i = 2; i < FDT_COUNT_LIMIT; i++) {
 		struct file *file = parent->fdt[i];
 		if (file == NULL) continue;
+		file = file_duplicate(file);
 		current->fdt[i] = file;
 	}
 	current->next_fd = parent->next_fd;
@@ -304,10 +308,12 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for (int i = 0; i < 500000000; i++)
-  	{
-  	}
-	return -1;
+	struct thread *child = get_child_process(child_tid);
+	if (child == NULL) return -1;
+	sema_down(&child->wait_sema);
+	list_remove(&child->child_elem);
+	return child->exit_status;
+
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -318,7 +324,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	sema_up(&cur->wait_sema);
 	process_cleanup ();
 }
 

@@ -126,6 +126,9 @@ struct thread
 	struct list_elem child_elem;
 
 	struct semaphore load_sema;
+	struct semaphore wait_sema;
+
+	enum thread_status exit_status;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

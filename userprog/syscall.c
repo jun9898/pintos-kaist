@@ -69,9 +69,9 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	// case SYS_EXEC:
 	// 	f->R.rax = exec(f->R.rdi);
 	// 	break;
-	// case SYS_WAIT:
-	// 	f->R.rax = wait(f->R.rdi);
-	// 	break;
+	case SYS_WAIT:
+		f->R.rax = wait(f->R.rdi);
+		break;
 	case SYS_CREATE:
 		f->R.rax = create(f->R.rdi, f->R.rsi);
 		break;
@@ -125,6 +125,7 @@ void
 exit(int status) {
 	struct thread *cur = thread_current();
 	printf("%s: exit(%d)\n", cur->name, status);
+	cur->exit_status = status;
 	thread_exit();
 }
 
@@ -234,6 +235,11 @@ void close(int fd)
 int fork (const char *thread_name)
 {
 	return process_fork(thread_name, NULL);
+}
+
+int wait (int pid)
+{
+	return process_wait(pid);
 }
 
 // int exec (const char *cmd_line) {

@@ -13,6 +13,11 @@
         "interrupt.h": "c",
         "syscall-nr.h": "c",
         "stdio.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "file.h": "c",
+        "intrinsic.h": "c",
+        "flags.h": "c",
+        "gdt.h": "c",
+        "loader.h": "c"
     }
 }

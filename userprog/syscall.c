@@ -12,6 +12,7 @@
 #include "filesys/file.h"
 #include "devices/input.h"
 #include "lib/kernel/stdio.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -66,9 +67,9 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		memcpy(&thread_current()->parent_if, f, sizeof(struct intr_frame));
 		f->R.rax = fork(f->R.rdi);
 		break;
-	// case SYS_EXEC:
-	// 	f->R.rax = exec(f->R.rdi);
-	// 	break;
+	case SYS_EXEC:
+		f->R.rax = exec(f->R.rdi);
+		break;
 	case SYS_WAIT:
 		f->R.rax = wait(f->R.rdi);
 		break;
@@ -242,18 +243,22 @@ int wait (int pid)
 	return process_wait(pid);
 }
 
-// int exec (const char *cmd_line) {
-// 	check_address(cmd_line);
+int exec (const char *cmd_line) {
+	check_address(cmd_line);
+	char *copy;
 
-// 	char *copy = palloc_get_page(0);
-// 	if ((copy) == NULL)
-// 		exit(-1);
-	
-// 	/* cmd_line -> const char* 형이므로 수정할 수 없다.
-// 	 * process_exec 함수 내에서 parsing이 이루어지므로 복사해서 전달 */
-// 	strlcpy(copy, cmd_line, strlen(cmd_line) + 1);
+	copy = palloc_get_page (PAL_ZERO);
 
-// 	if (process_exec(copy) == -1)
-// 		return -1;
+	strlcpy (copy, cmd_line, PGSIZE);
+
+	if (copy == NULL)
+		exit(-1);
+
+	/* cmd_line -> const char* 형이므로 수정할 수 없다.
+	 * process_exec 함수 내에서 parsing이 이루어지므로 복사해서 전달 */
+	strlcpy(copy, cmd_line, PGSIZE);
+	if (process_exec(copy) == -1) {
+		exit(-1);
+	}
 	
-// }
+}

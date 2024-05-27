@@ -121,7 +121,7 @@ struct thread
 	int next_fd;
 
 	struct thread* parent;
-	struct intr_frame parent_tf; 
+	struct intr_frame parent_if; 
 	struct list child_list;
 	struct list_elem child_elem;
 

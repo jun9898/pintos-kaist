@@ -12,6 +12,7 @@
         "input.h": "c",
         "interrupt.h": "c",
         "syscall-nr.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "stdbool.h": "c"
     }
 }

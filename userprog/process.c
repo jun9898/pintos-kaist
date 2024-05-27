@@ -83,14 +83,12 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	struct thread *parent = thread_current();
-	memcpy(&parent->parent_tf, &if_, sizeof(struct intr_frame));
 	int tid = thread_create (name, PRI_DEFAULT, __do_fork, parent);
 
 	if (tid == TID_ERROR) 
 		return TID_ERROR;
 
 	struct thread *child = get_child_process(tid);
-	child->tf.R.rax = 0; // 자식 쓰레드의 반환 값 : 0
 	sema_down(&child->load_sema);
 
 	return tid;
@@ -156,7 +154,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux; // 부모 쓰레드
 	struct thread *current = thread_current (); // 자식 쓰레드
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -192,6 +190,7 @@ __do_fork (void *aux) {
 	current->next_fd = parent->next_fd;
 
 	sema_up(&current->load_sema);
+	if_.R.rax = 0; // 자식 쓰레드의 반환 값 : 0
 	process_init ();
 
 	/* Finally, switch to the newly created process. */

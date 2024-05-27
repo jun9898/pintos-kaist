@@ -65,9 +65,9 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_FORK:
 		f->R.rax = fork(f->R.rdi);
 		break;
-	// case SYS_EXEC:
-	// 	f->R.rax = exec(f->R.rdi);
-	// 	break;
+	case SYS_EXEC:
+		f->R.rax = exec(f->R.rdi);
+		break;
 	// case SYS_WAIT:
 	// 	f->R.rax = wait(f->R.rdi);
 	// 	break;
@@ -233,4 +233,21 @@ void close(int fd)
 int fork (const char *thread_name)
 {
 	return process_fork(*thread_name, &thread_current()->tf);
+}
+
+int exec (const char *cmd_line) {
+	check_address(cmd_line);
+
+	char *copy = palloc_get_page(0);
+	if ((copy) == NULL)
+		exit(-1);
+	
+	/* cmd_line -> const char* 형이므로 수정할 수 없다.
+	 * process_exec 함수 내에서 parsing이 이루어지므로 복사해서 전달 */
+	strlcpy(copy, cmd_line, strlen(cmd_line) + 1);
+
+	if (process_exec(copy) == -1)
+		return -1;
+	
+	
 }

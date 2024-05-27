@@ -234,6 +234,10 @@ thread_create (const char *name, int priority,
 	thread_unblock (t);
 	preempt();
 
+	/* Hierarchy implement initialize */
+	t->parent = thread_current();
+	list_push_back(&thread_current()->child_list, &t->child_elem);
+
 	return tid;
 }
 
@@ -512,6 +516,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	t->nice = NICE_DEFAULT;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
+
+	/* Hierarchy implement initialize */
+	sema_init(&t->load_sema, 0);
+	list_init(&t->child_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

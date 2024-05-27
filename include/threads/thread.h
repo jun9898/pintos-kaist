@@ -120,6 +120,13 @@ struct thread
 	struct file **fdt;
 	int next_fd;
 
+	struct thread* parent;
+	struct intr_frame parent_tf; 
+	struct list child_list;
+	struct list_elem child_elem;
+
+	struct semaphore load_sema;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */

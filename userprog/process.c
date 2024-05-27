@@ -26,6 +26,7 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+struct thread *get_child_process(int pid);
 
 /* General process initializer for initd and other process. */
 static void
@@ -81,8 +82,30 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	struct thread *parent = thread_current();
+	memcpy(&parent->parent_tf, &if_, sizeof(struct intr_frame));
+	int tid = thread_create (name, PRI_DEFAULT, __do_fork, parent);
+
+	if (tid == TID_ERROR) 
+		return TID_ERROR;
+
+	struct thread *child = get_child_process(tid);
+	child->tf.R.rax = 0; // 자식 쓰레드의 반환 값 : 0
+	sema_down(&child->load_sema);
+
+	return tid;
+}
+
+struct thread *get_child_process(int pid)
+{
+	struct thread *cur = thread_current();
+	struct list *child_list = &cur->child_list;
+	for (struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e)) {
+		struct thread *t = list_entry(e, struct thread, child_elem);
+		if (t->tid == pid)
+			return t;
+	}
+	return NULL;
 }
 
 #ifndef VM
@@ -124,8 +147,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
-	struct thread *current = thread_current ();
+	struct thread *parent = (struct thread *) aux; // 부모 쓰레드
+	struct thread *current = thread_current (); // 자식 쓰레드
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
 	bool succ = true;
@@ -154,12 +177,22 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
+	/* 부모의 FDT 복사*/
+	for (int i = 2; i < FDT_COUNT_LIMIT; i++) {
+		struct file *file = parent->fdt[i];
+		if (file == NULL) continue;
+		current->fdt[i] = file;
+	}
+	current->next_fd = parent->next_fd;
+
+	sema_up(&current->load_sema);
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
 error:
+	sema_up(&current->load_sema);
 	thread_exit ();
 }
 

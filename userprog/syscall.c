@@ -141,47 +141,47 @@ remove(const char *file) {
 
 int 
 open (const char *file) {
-	check_address(file);
-	struct file *_file = filesys_open(file);
-	if (file == NULL)
-		return -1;
-	int fd = process_add_file(_file);
-	if (fd == -1) 
-		file_close(_file);
-	return process_add_file(_file);
+    check_address(file);
+    struct file *_file = filesys_open(file);
+
+    if (_file == NULL)
+        return -1;
+
+    int fd = process_add_file(_file);
+
+    if (fd == -1)
+        file_close(_file);
+
+    return fd;
 }
 
 int 
 filesize (int fd) {
 	struct file *file = process_get_file(fd);
-	check_address(file);
 	return file_length(file);
 }
 
 int
 read (int fd, void *buffer, unsigned size) {
-	int count = 0;
+	int count;
 	check_address(buffer);
 	unsigned char *bufp = buffer;
-	
-	lock_acquire(&filesys_lock);
-	struct file* file = process_get_file(fd);
-	if (file == NULL) {
-		lock_release(&filesys_lock);
-		return -1;
-	}
 
 	if (fd == 0) {
 		char key;
-		for (int count = 0; count < size; count++) {
+		for (int i = 0; i < size; count++) {
 				key  = input_getc();
 				*bufp++ = key;
 			if (key == '\0') 
 				break;
 		}
+		count += 1;
 	} else {
+		lock_acquire(&filesys_lock);
+		struct file* file = process_get_file(fd);
 		count = file_read(file, buffer, size);
 	}
+	
 	lock_release(&filesys_lock);
 	return count;
 }

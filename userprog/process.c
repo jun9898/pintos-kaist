@@ -52,6 +52,7 @@ process_create_initd (const char *file_name) {
 
     char *save_ptr;
     
+	/* 파일 명 첫 번째 토큰으로 갱신 */
 	file_name = strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
@@ -183,7 +184,6 @@ process_exec (void *f_name) {
     int count = 0;
     for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
         parse[count++] = token;
-    
 
 	/* We first kill the current context */
 	process_cleanup ();
@@ -641,22 +641,22 @@ install_page (void *upage, void *kpage, bool writable) {
  * 	  해당 프로세스의 파일 디스크립터 숫자 중 사용하지 않는 가장 작은 값 할당
 */
 int process_add_file(struct file *file) {
-    struct thread *cur = thread_current();
-    int start = cur->next_fd;
-
-    do {
-        if (cur->fdt[cur->next_fd] == NULL) {
-            cur->fdt[cur->next_fd] = file;
-            return cur->next_fd;
-        }
-
-        cur->next_fd++;
-        if (cur->next_fd >= FDT_COUNT_LIMIT) {
-            cur->next_fd = 2; 
-        }
-    } while (cur->next_fd != start);
-
-    return -1;
+    struct thread *t = thread_current();  
+    struct file **fdt = t->fdt;  
+    int cur_fd = t->next_fd;  
+ 
+    while (t->fdt[cur_fd] != NULL && cur_fd < FDT_COUNT_LIMIT) {
+        cur_fd++;
+    }
+    if (cur_fd >= FDT_COUNT_LIMIT) {
+        
+        return -1;
+    }
+ 
+    t->next_fd = cur_fd;  
+    fdt[cur_fd] = file;  
+ 
+    return cur_fd;  
 }
 
 

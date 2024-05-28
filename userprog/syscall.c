@@ -153,6 +153,9 @@ open (const char *file) {
     if (_file == NULL)
         return -1;
 
+	if (strcmp(thread_name(), file) == 0)
+		file_deny_write(_file);
+
     int fd = process_add_file(_file);
 
     if (fd == -1)
@@ -173,7 +176,6 @@ read (int fd, void *buffer, unsigned size) {
 	check_address(buffer);
 	unsigned char *bufp = buffer;
 
-	lock_acquire(&filesys_lock);
 	struct file* file = process_get_file(fd);
 	if (fd == 0) {
 		char key;
@@ -186,11 +188,11 @@ read (int fd, void *buffer, unsigned size) {
 		}
 		count += 1;
 	} else {
+		lock_acquire(&filesys_lock);
 		count = file_read(file, buffer, size);
-		file_deny_write(file);
+		lock_release(&filesys_lock);
 	}
 	
-	lock_release(&filesys_lock);
 	return count;
 }
 

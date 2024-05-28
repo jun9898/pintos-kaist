@@ -184,7 +184,7 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	/* 부모의 FDT 복사*/
+	/* 부모의 FDT 복사 */
 	for (int i = 2; i < FDT_COUNT_LIMIT; i++) {
 		struct file *file = parent->fdt[i];
 		if (file == NULL) continue;
@@ -326,6 +326,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+
 	process_cleanup ();
 	sema_up(&cur->wait_sema);
 	sema_down(&cur->exit_sema);
@@ -453,9 +454,6 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
-
-	// Add
-	file_deny_write(file);
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

@@ -127,6 +127,7 @@ struct thread
 
 	struct semaphore load_sema;
 	struct semaphore wait_sema;
+	struct semaphore exit_sema;
 
 	enum thread_status exit_status;
 

@@ -87,7 +87,6 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	if (tid == TID_ERROR) 
 		return TID_ERROR;
-
 	struct thread *child = get_child_process(tid);
 	sema_down(&child->load_sema);
 
@@ -101,7 +100,8 @@ struct thread *get_child_process(int pid)
 {
 	struct thread *cur = thread_current();
 	struct list *child_list = &cur->child_list;
-	for (struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e)) {
+	for (struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+	{
 		struct thread *t = list_entry(e, struct thread, child_elem);
 		if (t->tid == pid)
 			return t;
@@ -309,11 +309,13 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	struct thread *child = get_child_process(child_tid);
-	if (child == NULL) return -1;
+	if (child == NULL)
+		return -1;
+
 	sema_down(&child->wait_sema);
 	list_remove(&child->child_elem);
+	sema_up(&child->exit_sema);
 	return child->exit_status;
-
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -324,8 +326,9 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	sema_up(&cur->wait_sema);
 	process_cleanup ();
+	sema_up(&cur->wait_sema);
+	sema_down(&cur->exit_sema);
 }
 
 /* Free the current process's resources. */
@@ -450,6 +453,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
+	// Add
+	file_deny_write(file);
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

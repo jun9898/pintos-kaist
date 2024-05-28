@@ -520,6 +520,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* Hierarchy implement initialize */
 	sema_init(&t->load_sema, 0);
 	sema_init(&t->wait_sema, 0);
+	sema_init(&t->exit_sema, 0);
 	list_init(&t->child_list);
 
 	t->exit_status = 0;

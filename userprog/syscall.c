@@ -5,14 +5,16 @@
 #include "threads/thread.h"
 #include "threads/loader.h"
 #include "userprog/gdt.h"
-#include "threads/flags.h"
-#include "intrinsic.h"
 #include "userprog/process.h"
+#include "threads/flags.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "intrinsic.h"
+#include "threads/synch.h"
 #include "devices/input.h"
 #include "lib/kernel/stdio.h"
 #include "threads/palloc.h"
+
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -145,6 +147,7 @@ remove(const char *file) {
 int 
 open (const char *file) {
     check_address(file);
+	lock_acquire(&filesys_lock);
     struct file *_file = filesys_open(file);
 
     if (_file == NULL)
@@ -154,7 +157,7 @@ open (const char *file) {
 
     if (fd == -1)
         file_close(_file);
-
+	lock_release(&filesys_lock);
     return fd;
 }
 
@@ -170,19 +173,21 @@ read (int fd, void *buffer, unsigned size) {
 	check_address(buffer);
 	unsigned char *bufp = buffer;
 
+	lock_acquire(&filesys_lock);
+	struct file* file = process_get_file(fd);
 	if (fd == 0) {
 		char key;
 		for (int i = 0; i < size; count++) {
 				key  = input_getc();
 				*bufp++ = key;
-			if (key == '\0') 
+			if (key == '\0') {
 				break;
+			}
 		}
 		count += 1;
 	} else {
-		lock_acquire(&filesys_lock);
-		struct file* file = process_get_file(fd);
 		count = file_read(file, buffer, size);
+		file_deny_write(file);
 	}
 	
 	lock_release(&filesys_lock);
@@ -193,21 +198,16 @@ int
 write (int fd, const void *buffer, unsigned size) {
 	int count;
 	check_address(buffer);
-	lock_acquire(&filesys_lock);
 	if (fd == 1) {
 		putbuf(buffer, size);
-		lock_release(&filesys_lock);
 		return size;
 	}
-
 	struct file* file = process_get_file(fd);
 	if (file == NULL) {
-		lock_release(&filesys_lock);
 		return -1;
-	}
-	
+	}	
+	lock_acquire(&filesys_lock);
 	count = file_write(file, buffer, size);
-	
 	lock_release(&filesys_lock);
 	return count;
 }

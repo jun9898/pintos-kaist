@@ -18,6 +18,8 @@
         "intrinsic.h": "c",
         "flags.h": "c",
         "gdt.h": "c",
-        "loader.h": "c"
+        "loader.h": "c",
+        "__locale": "c",
+        "vm.h": "c"
     }
 }

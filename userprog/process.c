@@ -69,7 +69,6 @@ initd (void *f_name) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
-
 	process_init ();
 
 	if (process_exec (f_name) < 0)
@@ -87,11 +86,15 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 
 	if (tid == TID_ERROR) 
 		return TID_ERROR;
+
 	struct thread *child = get_child_process(tid);
 	sema_down(&child->load_sema);
 
-	if (child->exit_status == TID_ERROR)
+	if (child->exit_status == TID_ERROR) {
+		list_remove(&child->child_elem);
+		sema_up(&child->exit_sema);
 		return TID_ERROR;
+	}
 
 	return tid;
 }
@@ -162,6 +165,7 @@ __do_fork (void *aux) {
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0; // 자식 쓰레드의 반환 값 : 0
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -194,61 +198,72 @@ __do_fork (void *aux) {
 	current->next_fd = parent->next_fd;
 
 	sema_up(&current->load_sema);
-	if_.R.rax = 0; // 자식 쓰레드의 반환 값 : 0
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
 error:
+	current->exit_status = TID_ERROR;
 	sema_up(&current->load_sema);
-	thread_exit ();
+	exit(-1);
 }
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
-	bool success;
+    char *file_name = f_name;
+    bool success;
 
-	/* We cannot use the intr_frame in the thread structure.
-	 * This is because when current thread rescheduled,
-	 * it stores the execution information to the member. */
-	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;
-	_if.cs = SEL_UCSEG;
-	_if.eflags = FLAG_IF | FLAG_MBS;
+    /* We cannot use the intr_frame in the thread structure.
+     * This is because when current thread rescheduled,
+     * it stores the execution information to the member. */
+    struct intr_frame _if;
+    _if.ds = _if.es = _if.ss = SEL_UDSEG;
+    _if.cs = SEL_UCSEG;
+    _if.eflags = FLAG_IF | FLAG_MBS;
 
-	// Argument Passing
+    // Argument Passing
     char *parse[64];
     char *token, *save_ptr;
     int count = 0;
     for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
         parse[count++] = token;
 
-	/* We first kill the current context */
-	process_cleanup ();
+    /* Make a copy of file_name to use in load function */
+    char *file_name_copy = palloc_get_page(0);
+    if (file_name_copy == NULL) {
+        return -1;
+    }
+    strlcpy(file_name_copy, parse[0], PGSIZE);
 
-	/* And then load the binary */
-	success = load (file_name, &_if);
+    /* We first kill the current context */
+    process_cleanup ();
 
-	// Argument Passing
-    argument_stack(parse, count, &_if.rsp);
-    _if.R.rdi = count;
-    _if.R.rsi = (char *)_if.rsp + 8;
+    /* And then load the binary */
+    success = load(file_name_copy, &_if);
 
-    // hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true); 
+    /* Free the copied file_name */
+    palloc_free_page(file_name_copy);
 
-	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
-		return -1;
-	
-	/* Start switched process. */
-	do_iret (&_if);
-	NOT_REACHED ();
+    // Argument Passing
+    if (success) {
+        argument_stack(parse, count, &_if.rsp);
+        _if.R.rdi = count;
+        _if.R.rsi = (char *)_if.rsp + 8;
+    }
+
+    /* If load failed, quit. */
+    palloc_free_page (file_name);
+    if (!success)
+        return -1;
+    
+    /* Start switched process. */
+    do_iret (&_if);
+    NOT_REACHED ();
 }
+
 
 /**
  * &_if.rsp : 포인터의 주소 -> **rsp
@@ -326,7 +341,13 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	for (int i = FDT_PAGES; i < FDT_COUNT_LIMIT; i++) {
+		if (cur->fdt[i] != NULL) {
+			close(i);
+		}
+    }
+	palloc_free_multiple(cur->fdt, FDT_PAGES);
+	cur->fdt = NULL;
 	process_cleanup ();
 	sema_up(&cur->wait_sema);
 	sema_down(&cur->exit_sema);

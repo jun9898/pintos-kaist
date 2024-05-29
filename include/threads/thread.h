@@ -129,6 +129,8 @@ struct thread
 	struct semaphore wait_sema;
 	struct semaphore exit_sema;
 
+	struct thread *running;
+
 	enum thread_status exit_status;
 
 #ifdef USERPROG

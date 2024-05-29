@@ -147,7 +147,7 @@ remove(const char *file) {
 int 
 open (const char *file) {
     check_address(file);
-	lock_acquire(&filesys_lock);
+	// lock_acquire(&filesys_lock);
     struct file *_file = filesys_open(file);
 
     if (_file == NULL)
@@ -160,7 +160,7 @@ open (const char *file) {
 
     if (fd == -1)
         file_close(_file);
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
     return fd;
 }
 

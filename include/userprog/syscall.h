@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 void syscall_init (void);
+struct lock filesys_lock;
 
 // Implements
 void halt (void);

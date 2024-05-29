@@ -224,8 +224,9 @@ thread_create (const char *name, int priority,
 	// File descriptor table initialize
 	t -> fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
 	
-	if (t->fdt == NULL) 
-		PANIC("Failed to allocate file descriptor table.");
+	if (t->fdt == NULL) {
+		return TID_ERROR;
+	}
 		
 	t->next_fd = 2;
 

@@ -172,8 +172,12 @@ vm_do_claim_page (struct page *page) {
 }
 
 /* Initialize new supplemental page table */
+// spt == vm_entry?
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	/* hash_hash_func, hash_less_func 얘는 왜 해줘야할까 
+	 * 이게 유주님이 말한 hash_bound인건가 */
+	hash_init(spt, hash_hash_func, hash_less_func, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -187,4 +191,10 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+}
+
+/* */
+uint64_t hash_hash_func (const struct hash_elem *e, void *aux) {
+	const struct page *p = hash_entry(e, struct page, hash_elem);
+	return hash_bytes(&p->va, sizeof(p->va));
 }

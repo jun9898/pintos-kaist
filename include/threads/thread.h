@@ -1,11 +1,13 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 #define USERPROG
+#define VM
 
 #define thread_entry(tid) ((struct thread*) &tid)
 
 #include <debug.h>
 #include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/synch.h"
@@ -141,7 +143,9 @@ struct thread
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
+	// spt는 hash를 가지고 있고 그 hash에는 vm_entry가 포함되어 있음
 	struct supplemental_page_table spt;
+	struct hash vm;
 	void *rsp;
 #endif
 

@@ -141,8 +141,8 @@ exit (int status) {
 	thread_exit();
 }
 
-int exec(const char *cmd_line)
-{
+int 
+exec(const char *cmd_line) {
 	check_addr(cmd_line);
 
 	char *fn_copy;

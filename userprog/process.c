@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "kernel/hash.h"
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
@@ -301,6 +302,7 @@ process_exit (void) {
 
 	process_exit_file();
 	palloc_free_multiple(cur->fdt, FDT_PAGES);
+	supplemental_page_table_kill(&cur->spt);
 
 	sema_up(&cur->wait_sema);
 	sema_down(&cur->exit_sema);
@@ -692,6 +694,22 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	struct file_metadata *file_metadata = (struct file_metadata *) aux;
+
+	struct file *file = file_metadata->file;
+	off_t offset = file_metadata->offset;
+	size_t read_bytes = file_metadata->read_byte;
+	size_t non_read_bytes = PGSIZE - read_bytes;
+
+	file_seek(file, offset);
+
+	if (file_read(file, page->frame->kva, read_bytes) != read_bytes) {
+		palloc_free_page(page->frame->kva);
+		return false;
+	}
+
+	memset(page->frame->kva + read_bytes, 0, non_read_bytes);
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -723,9 +741,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+		struct file_metadata *file_metadata = (struct file_metadata *) malloc(sizeof(struct file_metadata));
+		file_metadata->file = file;
+		file_metadata->read_byte = read_bytes;
+		file_metadata->offset = ofs;
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, file_metadata))
 			return false;
 
 		/* Advance. */

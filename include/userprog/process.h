@@ -3,6 +3,13 @@
 
 #include "threads/thread.h"
 
+struct file_metadata {
+    struct file *file;
+    uint32_t read_byte;
+    off_t offset;
+};
+
+
 tid_t process_create_initd (const char *file_name);
 tid_t process_fork (const char *name, struct intr_frame *if_);
 int process_exec (void *f_name);

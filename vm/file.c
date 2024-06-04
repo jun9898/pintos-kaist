@@ -56,3 +56,4 @@ do_mmap (void *addr, size_t length, int writable,
 void
 do_munmap (void *addr) {
 }
+

@@ -145,7 +145,6 @@ struct thread
 	/* Table for whole virtual memory owned by thread. */
 	// spt는 hash를 가지고 있고 그 hash에는 vm_entry가 포함되어 있음
 	struct supplemental_page_table spt;
-	struct hash vm;
 	void *rsp;
 #endif
 

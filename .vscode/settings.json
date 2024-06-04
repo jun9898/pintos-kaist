@@ -14,6 +14,12 @@
         "console.h": "c",
         "file.h": "c",
         "stdio.h": "c",
-        "vga.h": "c"
+        "vga.h": "c",
+        "malloc.h": "c",
+        "hash.h": "c",
+        "inspect.h": "c",
+        "palloc.h": "c",
+        "vaddr.h": "c",
+        "disk.h": "c"
     }
 }

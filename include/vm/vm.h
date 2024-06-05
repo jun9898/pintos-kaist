@@ -54,7 +54,7 @@ struct page {
 
 	/* Your implementation */
 	struct hash_elem hash_elem; /* 해시 테이블 Element */
-	bool write_able;
+	bool writable;
 	// struct vm_entry *vm_entry;
 
 	/* Per-type data are binded into the union.
@@ -95,7 +95,10 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem frame_elem;
 };
+
+static struct list frame_table;
 
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.

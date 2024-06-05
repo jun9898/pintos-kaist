@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #ifdef VM
+#define VM
 #include "vm/vm.h"
 #endif
 
@@ -227,6 +228,7 @@ process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
 
+
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -298,11 +300,12 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	process_cleanup ();
 
 	process_exit_file();
 	palloc_free_multiple(cur->fdt, FDT_PAGES);
-	supplemental_page_table_kill(&cur->spt);
+
+	process_cleanup ();
+	// hash_destroy(&cur->spt.spt_hash, NULL);
 
 	sema_up(&cur->wait_sema);
 	sema_down(&cur->exit_sema);
@@ -535,7 +538,6 @@ load (const char *file_name, struct intr_frame *if_) {
 done:
 	/* We arrive here whether the load is successful or not. */
 	file_close (file);
-
 	return success;
 }
 
@@ -703,11 +705,10 @@ lazy_load_segment (struct page *page, void *aux) {
 
 	file_seek(file, offset);
 
-	if (file_read(file, page->frame->kva, read_bytes) != read_bytes) {
+	if (file_read(file, page->frame->kva, read_bytes) != (int)read_bytes) {
 		palloc_free_page(page->frame->kva);
 		return false;
 	}
-
 	memset(page->frame->kva + read_bytes, 0, non_read_bytes);
 	return true;
 }
@@ -729,6 +730,7 @@ lazy_load_segment (struct page *page, void *aux) {
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
@@ -741,24 +743,29 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		struct file_metadata *file_metadata = (struct file_metadata *) malloc(sizeof(struct file_metadata));
+
+		struct file_metadata *file_metadata = (struct file_metadata *)malloc(sizeof(struct file_metadata));
 		file_metadata->file = file;
-		file_metadata->read_byte = read_bytes;
+		file_metadata->read_byte = page_read_bytes;
 		file_metadata->offset = ofs;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, file_metadata))
+
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, file_metadata)) {
 			return false;
+		}
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += page_read_bytes;
 	}
+
 	return true;
 }
 
+
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
-static bool
+bool
 setup_stack (struct intr_frame *if_) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
@@ -767,6 +774,17 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+
+	struct thread *thread = thread_current();
+
+	// vm_alloc_page: type, upage, writable
+	if (vm_alloc_page_with_initializer(VM_ANON | VM_MARKER_0, stack_bottom, true, NULL, NULL)) {
+		success = vm_claim_page(stack_bottom);
+		if (success) {
+			if_->rsp = USER_STACK;
+            thread->rbp = stack_bottom;
+		}
+    }
 
 	return success;
 }

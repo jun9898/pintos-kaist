@@ -6,6 +6,7 @@
 struct file_metadata {
     struct file *file;
     uint32_t read_byte;
+    uint32_t zero_byte;
     off_t offset;
 };
 

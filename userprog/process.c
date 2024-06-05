@@ -701,7 +701,7 @@ lazy_load_segment (struct page *page, void *aux) {
 	struct file *file = file_metadata->file;
 	off_t offset = file_metadata->offset;
 	size_t read_bytes = file_metadata->read_byte;
-	size_t non_read_bytes = PGSIZE - read_bytes;
+	size_t non_read_bytes = file_metadata->zero_byte;
 
 	file_seek(file, offset);
 
@@ -748,6 +748,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		file_metadata->file = file;
 		file_metadata->read_byte = page_read_bytes;
 		file_metadata->offset = ofs;
+		file_metadata->zero_byte = PGSIZE - page_read_bytes;
+		file_metadata->zero_byte = page_zero_bytes;
 
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, file_metadata)) {
 			return false;

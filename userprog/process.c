@@ -301,6 +301,9 @@ process_exit (void) {
 
 	process_exit_file();
 	palloc_free_multiple(cur->fdt, FDT_PAGES);
+	
+	//process_cleanup 에서 함
+	// supplemental_page_table_kill(&cur->spt); 
 
 	sema_up(&cur->wait_sema);
 	sema_down(&cur->exit_sema);
@@ -728,6 +731,17 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 					writable, lazy_load_segment, aux))
 			return false;
 
+		// struct page *page = (struct page *)malloc(sizeof(struct page));
+		// page->file = file;
+		// page->offset = ofs;
+		// page->read_bytes = page_read_bytes;
+		// page->zero_bytes = page_zero_bytes; //마지막 패딩에 사용될 제로 바이트
+		// page->writable = writable; 
+
+		// spt_insert_page(, page);
+		
+		// vm_alloc_page_with_initializer();
+	
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;

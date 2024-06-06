@@ -1,6 +1,7 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
 #define USERPROG
+#define VM
 
 #define thread_entry(tid) ((struct thread*) &tid)
 
@@ -123,6 +124,7 @@ struct thread
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
 
+	// project2
 	// file fdt 선언
 	int **fdt;
 	int next_fd; 

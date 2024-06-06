@@ -224,7 +224,29 @@ read (int fd, void *buffer, unsigned size) {
 		lock_release(&filesys_lock);
 		return count;
 	}
+	// if (fd == 0) {
+	// 	char key;
+	// 	for(int i = 0; i < size; i++) {
+	// 		key = input_getc();
+	// 		*buff++ = key;
+	// 		if (key == '\0') {
+	// 			count = i;
+	// 			break;
+	// 		}
+	// 	}
+	// } 
+	// else if (fd == 1)
+	// {
+	// 	lock_release(&filesys_lock);
+	// 	return;
+	// }
 	
+	// else {
+	// 	struct file *open_file = process_get_file(fd);
+	// 	count = file_read(open_file, buffer, size);
+	// }
+	// lock_release(&filesys_lock);
+	// return count;
 }
 
 int 

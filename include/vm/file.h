@@ -2,8 +2,6 @@
 #define VM_FILE_H
 #include "filesys/file.h"
 #include "vm/vm.h"
-#include "kernel/list.h"
-#include "kernel/hash.h"
 
 struct page;
 enum vm_type;

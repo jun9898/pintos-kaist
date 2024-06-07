@@ -1,5 +1,8 @@
 /* vm.c: Generic interface for virtual memory objects. */
 
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/mmu.h"
@@ -162,6 +165,7 @@ vm_get_frame(void)
 static void
 vm_stack_growth(void *addr UNUSED)
 {
+	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1);
 }
 
 /* Handle the fault on write_protected page */
@@ -178,16 +182,22 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	if (addr == NULL)
-		return false;
+		exit(-1);
 
 	if (is_kernel_vaddr(addr))
-		return false;
+		exit(-1);
 
 	if (not_present) 
 	{
+		void *rsp = user ? f->rsp : thread_current()->rsp;
+		
+		if ((USER_STACK - (1 << 20) <= rsp -8 && rsp - 8 == addr && addr <= USER_STACK) ||
+			(USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK))
+			vm_stack_growth(addr);
+
 		page = spt_find_page(spt, addr);
 		if (page == NULL)
-			return false;
+			exit(-1);
 		if (write == 1 && page->writable == 0)
 			return false;
 		return vm_do_claim_page(page);
@@ -256,8 +266,42 @@ void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 
 /* Copy supplemental page table from src to dst */
 bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
-								  struct supplemental_page_table *src UNUSED)
+								  struct supplemental_page_table *src UNUSED) 
 {
+	struct hash_iterator it;
+	for (hash_first(&it, &src->spt_hash); hash_next(&it);) 
+	{
+		/* TODO. 부모 프로세스의 type과 va, writable을 가져와서 우선 저장해둔다.*/ 
+		struct page *src_page = hash_entry(hash_cur(&it), struct page, hash_elem);
+		enum vm_type type = src_page->operations->type;
+		bool writable = src_page->writable;
+		void *upage = src_page->va;
+
+		/* TODO. type이 uninit이면 uninit page 생성 및 초기화 (vm_alloc_page_with_initializer).*/ 
+		if (type == VM_UNINIT) 
+		{
+			vm_initializer *init = src_page->uninit.init;
+			void *aux = src_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			continue;
+		}
+
+		/* TODO. type이 uninit이 아니면 vm_alloc_page 함수로 즉시 페이지 로딩을 진행해준다.*/ 
+		if (!vm_alloc_page(type, upage, writable)) {
+			return false;
+		}
+
+		/* TODO. 그 후 vm_claim_page로 페이지를 할당, 매핑 해준다.*/ 
+		if (!vm_claim_page(upage)) {
+			return false;
+		}
+
+		/* TODO. 마지막으로 vm_claim_page로 매핑된 va로 page를 조회하고, memcpy를 진행해준다.*/ 
+		struct page *new_page = spt_find_page(&dst->spt_hash, upage);
+		memcpy(new_page->frame->kva, src_page->frame->kva, PGSIZE);
+	}
+	return true;
+
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -265,4 +309,11 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	hash_clear(&spt->spt_hash, hash_page_destroy);
+}
+
+void hash_page_destroy(struct hash_elem *e, void *aux) {
+	struct page *page = hash_entry(e, struct page, hash_elem);
+destroy(page);
+	free(page);
 }

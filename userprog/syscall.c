@@ -64,6 +64,9 @@ void syscall_init(void)
 void syscall_handler(struct intr_frame *f UNUSED)
 {
 	int syscall_n = f->R.rax; /* 시스템 콜 넘버 */
+#ifdef VM
+	thread_current()->rsp = f->rsp;
+#endif
 	switch (syscall_n)
 	{
 	case SYS_HALT:
@@ -116,8 +119,6 @@ void check_address(void *addr)
 		exit(-1);
 	if (!is_user_vaddr(addr))
 		exit(-1);
-	// if (pml4_get_page(thread_current()->pml4, addr) == NULL)
-	// 	exit(-1);
 }
 
 void halt(void)

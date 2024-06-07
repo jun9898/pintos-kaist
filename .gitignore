@@ -1,5 +1,5 @@
-.DS_Store
-/.vscode
-/threads/build
-/userprog/build
-
+.vscode
+threads/build
+userprog/build
+vm/build
+filesys/build

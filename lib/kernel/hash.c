@@ -21,6 +21,9 @@ static void rehash (struct hash *);
 
 /* Initializes hash table H to compute hash values using HASH and
    compare hash elements using LESS, given auxiliary data AUX. */
+   /* 해시 테이블 H를 초기화하여, 
+   해시 값을 계산할 때 HASH를 사용하고 해시 요소를 비교할 때 LESS를 사용하며, 
+   보조 데이터 AUX를 제공합니다.*/
 bool
 hash_init (struct hash *h,
 		hash_hash_func *hash, hash_less_func *less, void *aux) {
@@ -88,17 +91,19 @@ hash_destroy (struct hash *h, hash_action_func *destructor) {
    no equal element is already in the table.
    If an equal element is already in the table, returns it
    without inserting NEW. */
+   /* 해시 테이블에 새로운 요소를 삽입하는 함수
+   	해시 테이블 h에 새로운 요소 new를 삽입*/
 struct hash_elem *
 hash_insert (struct hash *h, struct hash_elem *new) {
-	struct list *bucket = find_bucket (h, new);
-	struct hash_elem *old = find_elem (h, bucket, new);
+	struct list *bucket = find_bucket (h, new);			// 해시테이블 h와 새로운 new를 기반으로 버킷을 찾음
+	struct hash_elem *old = find_elem (h, bucket, new);	// 찾은 버킷에서 기존 요소가 있는지 확인
 
-	if (old == NULL)
-		insert_elem (h, bucket, new);
+	if (old == NULL)									// 기존 요소가 없다면
+		insert_elem (h, bucket, new);					// 새로운 요소를 버킷에 삽입
 
-	rehash (h);
+	rehash (h);											// 해시 테이블을 리해싱 (필요시 재정렬)
 
-	return old;
+	return old;											// 기존 요소를 반환 (없으면 NULL)
 }
 
 /* Inserts NEW into hash table H, replacing any equal element
@@ -119,6 +124,8 @@ hash_replace (struct hash *h, struct hash_elem *new) {
 
 /* Finds and returns an element equal to E in hash table H, or a
    null pointer if no equal element exists in the table. */
+   /* 해시 테이블 H에서 E와 동일한 요소를 찾아 반환하거나, 
+   동일한 요소가 테이블에 존재하지 않으면 null 포인터를 반환합니다.*/
 struct hash_elem *
 hash_find (struct hash *h, struct hash_elem *e) {
 	return find_elem (h, find_bucket (h, e), e);

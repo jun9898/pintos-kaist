@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include "lib/stdio.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -32,6 +33,7 @@ void close(int fd);
 tid_t fork(const char *thread_name, struct intr_frame *f);
 int exec(const char *cmd_line);
 int wait(int pid);
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset);
 
 /* System call.
  *
@@ -69,6 +71,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 #endif
 	switch (syscall_n)
 	{
+
 	case SYS_HALT:
 		halt();
 		break;
@@ -107,6 +110,12 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		break;
 	case SYS_TELL:
 		f->R.rax = tell(f->R.rdi);
+		break;
+	case SYS_MMAP:
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
+	case SYS_MUNMAP:
+		halt();
 		break;
 	case SYS_CLOSE:
 		close(f->R.rdi);
@@ -281,4 +290,23 @@ int exec(const char *cmd_line)
 int wait(int pid)
 {
 	return process_wait(pid);
+}
+
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) 
+{
+	if (!addr || addr != pg_round_down(addr)) return NULL;
+
+	if (!offset || offset != pg_round_down(offset)) return NULL;
+
+	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length)) return NULL;
+
+	if (spt_find_page(&thread_current()->spt, addr)) return NULL;
+
+	struct file *f = process_get_file(fd);
+	if (f == NULL) return NULL;
+
+	if (file_length(f) == 0 || (int) length <= 0) return NULL;
+
+	do_mmap(addr, length, writable, f, offset);
+
 }

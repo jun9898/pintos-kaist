@@ -1,6 +1,8 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "threads/vaddr.h"
+#include "userprog/process.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -50,6 +52,57 @@ file_backed_destroy (struct page *page) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
+	struct file *file = file_reopen(file);
+	void *start_addr = addr;
+
+	int total_page;
+
+	if (length <= PGSIZE) {
+	    total_page = 1;
+	} else {
+	    if (length % PGSIZE) {
+	        total_page = length / PGSIZE + 1;
+	    } else {
+	        total_page = length / PGSIZE;
+	    }
+	}
+
+	size_t read_bytes = file_length(file) < length ? file_length(file) : length;
+	size_t zero_bytes = PGSIZE - read_bytes * PGSIZE;
+
+	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
+	ASSERT (pg_ofs (addr) == 0);
+	ASSERT (offset % PGSIZE == 0);
+
+	while (read_bytes > 0 || zero_bytes > 0) {
+		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+		/* TODO: Set up aux to pass information to the lazy_load_segment. */
+        struct file_meta_data *meta = malloc(sizeof(struct file_meta_data));
+		if (meta == NULL)
+			return NULL;
+        
+        meta->file = file;
+        meta->page_read_bytes = page_read_bytes;
+		meta->page_zero_bytes = page_zero_bytes;
+        meta->ofs = offset;
+
+		if (!vm_alloc_page_with_initializer (VM_ANON, addr, writable, lazy_load_segment, meta)) {
+			return NULL;
+		} 
+
+		struct page *page = spt_find_page(&thread_current()->spt, start_addr);
+		page->mapped_page_count = total_page;
+
+		/* Advance. */
+		read_bytes -= page_read_bytes;
+		zero_bytes -= page_zero_bytes;
+		offset += page_read_bytes;
+		addr += PGSIZE;
+	}
+	return start_addr;
+
 }
 
 /* Do the munmap */

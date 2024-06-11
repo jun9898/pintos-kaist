@@ -5,6 +5,7 @@ struct page;
 enum vm_type;
 
 struct anon_page {
+  int swap_index // swap된 데이터들이 저장된 섹터 구역 나타내기.
 };
 
 void vm_anon_init (void);

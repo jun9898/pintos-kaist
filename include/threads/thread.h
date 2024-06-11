@@ -129,6 +129,8 @@ struct thread
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void *stack_bottom;
+	void *rsp; //커널 모드로 전환될 때 현재 유저 스택의 스택 포인터를 저장해두기 위한 필드
 #endif
 
 	/* Owned by thread.c. */

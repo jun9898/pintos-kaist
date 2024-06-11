@@ -3,12 +3,12 @@
 
 #include "threads/thread.h"
 
-struct file_meta_data
+struct lazy_load_arg
 {
-	struct file *file;
-	off_t ofs;
-	uint32_t page_read_bytes;
-	uint32_t page_zero_bytes;
+    struct file *file;
+    off_t ofs;
+    uint32_t read_bytes;
+    uint32_t zero_bytes;
 };
 
 tid_t process_create_initd(const char *file_name);
@@ -22,5 +22,6 @@ int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 struct thread *get_child_process(int pid);
+bool lazy_load_segment(struct page *page, void *aux);
 
 #endif /* userprog/process.h */
